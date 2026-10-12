@@ -1,0 +1,3 @@
+plugins { id 'com.android.application' }
+android { namespace 'br.com.testeremoto'; compileSdk 35
+ defaultConfig { applicationId 'br.com.testeremoto'; minSdk 24; targetSdk 35; versionCode 1; versionName '0.1' } }
