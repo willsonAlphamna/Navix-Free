@@ -1,0 +1,183 @@
+name: Build and test NAVIX iPhone
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: Temporary HTTPS source download
+        required: true
+        type: string
+      source_sha256:
+        description: SHA256 of the source archive
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Compile iPhone app and run XCTest
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Load the private source archive
+        env:
+          NAVIX_SOURCE_URL: ${{ inputs.source_url }}
+          NAVIX_SOURCE_SHA256: ${{ inputs.source_sha256 }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$NAVIX_SOURCE_URL"
+          python3 - <<'PYFETCH'
+          import hashlib, io, os, pathlib, re, shutil, tempfile, urllib.parse, urllib.request, zipfile
+          url = os.environ['NAVIX_SOURCE_URL']
+          expected = os.environ['NAVIX_SOURCE_SHA256']
+          parsed = urllib.parse.urlsplit(url)
+          if parsed.scheme != 'https' or not parsed.hostname or not parsed.hostname.endswith('.trycloudflare.com') or parsed.username or parsed.password:
+              raise SystemExit('An HTTPS source URL from the configured tunnel is required.')
+          if not re.fullmatch('[a-f0-9]{64}', expected):
+              raise SystemExit('Invalid source checksum.')
+          with urllib.request.urlopen(url, timeout=60) as response:
+              data = response.read(5_000_001)
+          if len(data) > 5_000_000 or hashlib.sha256(data).hexdigest() != expected:
+              raise SystemExit('Source archive size or checksum differs.')
+          with tempfile.TemporaryDirectory() as temporary:
+              root = pathlib.Path(temporary)
+              with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                  if sum(entry.file_size for entry in archive.infolist()) > 10_000_000:
+                      raise SystemExit('Expanded source archive is too large.')
+                  for entry in archive.infolist():
+                      target = (root / entry.filename).resolve()
+                      if root.resolve() not in target.parents:
+                          raise SystemExit('Invalid archive path.')
+                  archive.extractall(root)
+              shutil.copytree(root / 'NAVIX_IPHONE_CONTROL' / 'ios', pathlib.Path('ios'))
+          print('Source checksum verified; iOS project ready.')
+          PYFETCH
+
+      - name: Record Xcode environment
+        run: |
+          set -euo pipefail
+          mkdir -p build/logs build/results build/artifacts
+          xcodebuild -version | tee build/logs/xcode-version.log
+          xcodebuild -showsdks | tee build/logs/xcode-sdks.log
+
+      - name: Compile unsigned Release app for iPhone
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project ios/NavixPhone.xcodeproj \
+            -scheme NavixPhone \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/device \
+            -resultBundlePath build/results/device-build.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee build/logs/device-build.log
+
+      - name: Package the compiled unsigned app
+        run: |
+          set -euo pipefail
+          app='build/device/Build/Products/Release-iphoneos/NavixPhone.app'
+          test -f "$app/Info.plist"
+          test -f "$app/NavixPhone"
+          mkdir -p build/package/Payload
+          /usr/bin/ditto "$app" build/package/Payload/NavixPhone.app
+          (
+            cd build/package
+            /usr/bin/zip -qry ../artifacts/NavixPhone-unsigned.ipa Payload
+          )
+          cat > build/artifacts/SIGNING_REQUIRED.txt <<'EOF'
+          NAVIX iPhone — compiled, UNSIGNED iOS application
+
+          NavixPhone-unsigned.ipa contains the actual Release-iphoneos app produced
+          by xcodebuild on this GitHub Actions macOS runner. It has no Apple code
+          signature and no provisioning profile. This is not an installable app
+          download: opening the IPA in Safari does not install it on an iPhone.
+
+          Installation on a physical iPhone requires a valid Apple signing and
+          provisioning process for that device, or an authorized distribution
+          method such as TestFlight after signing with an Apple Developer account.
+          No Apple certificates, account credentials, or signing secrets were used
+          by this workflow. Simulator test results are in the separate diagnostics
+          artifact; verify the workflow status before relying on those results.
+
+          The app must be open and connected to the NAVIX bridge to apply brightness
+          commands. This build does not provide unrestricted iPhone system control.
+          EOF
+          shasum -a 256 build/artifacts/NavixPhone-unsigned.ipa \
+            > build/artifacts/SHA256SUMS.txt
+
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          set -euo pipefail
+          xcrun simctl list devices available --json > build/logs/simulators.json
+          udid=$(python3 - <<'PY'
+          import json
+          import re
+          import sys
+
+          with open('build/logs/simulators.json', encoding='utf-8') as source:
+              runtimes = json.load(source)['devices']
+          candidates = []
+          for runtime, devices in runtimes.items():
+              match = re.search(r'\.iOS-([0-9-]+)$', runtime)
+              if not match:
+                  continue
+              version = tuple(int(part) for part in match.group(1).split('-'))
+              for device in devices:
+                  if device.get('isAvailable') and device['name'].startswith('iPhone'):
+                      candidates.append((version, device['name'], device['udid']))
+          if not candidates:
+              sys.exit('No available iPhone simulator was found on this runner.')
+          print(max(candidates)[2])
+          PY
+          )
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          echo "Selected iPhone simulator: $udid" | tee build/logs/selected-simulator.log
+
+      - name: Run XCTest on iPhone simulator
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project ios/NavixPhone.xcodeproj \
+            -scheme NavixPhone \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}' \
+            -destination-timeout 180 \
+            -parallel-testing-enabled NO \
+            -derivedDataPath build/simulator \
+            -resultBundlePath build/results/simulator-tests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee build/logs/simulator-tests.log
+
+      - name: Upload compiled unsigned IPA
+        if: ${{ always() && !cancelled() && hashFiles('build/artifacts/NavixPhone-unsigned.ipa') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: NavixPhone-unsigned
+          path: build/artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build and test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: NavixPhone-build-and-test-diagnostics
+          path: |
+            build/logs/
+            build/results/
+          if-no-files-found: warn
+          retention-days: 14
