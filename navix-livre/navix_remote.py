@@ -30,7 +30,7 @@ def load_token(path=TOKEN_FILE):
 
 def make_handler(agent,token):
     class Handler(BaseHTTPRequestHandler):
-        server_version="NavixLivre/0.2"
+        server_version="NavixLivre/0.3"
         sys_version=""
         def log_message(self,*_args):
             pass
