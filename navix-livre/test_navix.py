@@ -19,7 +19,7 @@ class TestNavix(unittest.TestCase):
         self.assertEqual(len(self.a.search_files(str(self.r),"arquivo")["resultados"]),1)
     def test_read_binary_rejected(self):
         p=self.r/"picture.dat"
-        p.write_bytes(b"abc\\x00def".replace(b"\\\\x00",b"\\x00"))
+        p.write_bytes(b"abc"+bytes([0])+b"def")
         with self.assertRaises(ValueError): self.a.read_text(str(p))
 
     def test_large_file_rejected(self):
