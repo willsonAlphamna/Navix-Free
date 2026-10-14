@@ -200,10 +200,52 @@ def gui(agent):
         try:
             if os.name=="nt": os.startfile(str(agent.desktop))
         except Exception as e: messagebox.showerror("Erro",str(e))
-    bar=tk.Frame(win);bar.pack(pady=12)
-    tk.Button(bar,text="Listar Area de Trabalho",command=listing).pack(side="left",padx=8)
-    tk.Button(bar,text="Abrir Area de Trabalho",command=open_desktop).pack(side="left",padx=8)
-    tk.Button(bar,text="Diagnostico",command=lambda:show(agent.status())).pack(side="left",padx=8)
+    bridge=[None]
+    def start_bridge():
+        try:
+            proc=bridge[0]
+            if proc is not None and proc.poll() is None:
+                messagebox.showinfo("Navix Livre","Conexao MCP local ja iniciada.")
+                return
+            if getattr(sys,"frozen",False):
+                executable=Path(sys.executable).with_name("NavixBridge.exe")
+                if not executable.is_file():
+                    raise FileNotFoundError("NavixBridge.exe nao encontrado na pasta do programa")
+                argv=[str(executable)]
+            else:
+                script=Path(__file__).with_name("navix_remote.py")
+                if not script.is_file():
+                    raise FileNotFoundError("navix_remote.py nao encontrado")
+                argv=[sys.executable,str(script)]
+            bridge[0]=subprocess.Popen(argv,cwd=str(Path(argv[-1]).parent),
+                creationflags=getattr(subprocess,"CREATE_NEW_CONSOLE",0))
+            messagebox.showinfo("Ponte MCP local iniciada",
+                "Porta: 127.0.0.1:8765. Somente no proprio computador.\n"
+                "Para parar, use o botao Parar ou feche a janela da ponte.\n"
+                "Isso nao conecta automaticamente a conversa do ChatGPT.")
+        except Exception as exc:
+            messagebox.showerror("Erro ao iniciar ponte",str(exc))
+
+    def stop_bridge():
+        proc=bridge[0]
+        if proc is not None and proc.poll() is None:
+            proc.terminate()
+            bridge[0]=None
+            messagebox.showinfo("Navix Livre","Conexao MCP local encerrada.")
+        else:
+            messagebox.showinfo("Navix Livre",
+                "Nenhuma ponte iniciada por este painel.\n"
+                "Se abriu pelo Menu Iniciar, feche a janela Conexao MCP local.")
+
+    bar=tk.Frame(win);bar.pack(pady=6)
+    tk.Button(bar,text="Listar Area de Trabalho",command=listing).pack(side="left",padx=6)
+    tk.Button(bar,text="Abrir Area de Trabalho",command=open_desktop).pack(side="left",padx=6)
+    tk.Button(bar,text="Diagnostico",command=lambda:show(agent.status())).pack(side="left",padx=6)
+    remote=tk.Frame(win);remote.pack(pady=4)
+    tk.Button(remote,text="Iniciar conexao MCP local",command=start_bridge).pack(side="left",padx=6)
+    tk.Button(remote,text="Parar conexao MCP local",command=stop_bridge).pack(side="left",padx=6)
+    tk.Label(win,text="Conexao externa com ChatGPT exige configuracao adicional.",
+             fg="#6c2828").pack(pady=(2,8))
     show(agent.status());win.mainloop()
 
 def main():
