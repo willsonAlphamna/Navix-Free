@@ -6,10 +6,6 @@ on:
     paths:
       - "navix-livre/**"
       - ".github/workflows/navix-livre-build.yml"
-  pull_request:
-    paths:
-      - "navix-livre/**"
-      - ".github/workflows/navix-livre-build.yml"
   workflow_dispatch:
     inputs:
       publish:
@@ -17,6 +13,23 @@ on:
         type: boolean
         required: true
         default: false
+      prepare_store:
+        description: "Preparar pacote MSIX para submissao na Microsoft Store"
+        type: boolean
+        required: true
+        default: false
+      store_identity_name:
+        description: "Package/Identity/Name do Partner Center"
+        type: string
+        required: false
+      store_publisher:
+        description: "Package/Identity/Publisher do Partner Center (CN=...)"
+        type: string
+        required: false
+      store_publisher_display_name:
+        description: "Nome de exibicao do editor cadastrado na Store"
+        type: string
+        required: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.publish || false }}
@@ -40,6 +53,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Instalar ferramentas de compilacao
+        run: |
+          python -m pip install pyinstaller==6.16.0 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar dependencias Python" }
+          choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar Inno Setup" }
+
       - name: Conferir versao unica
         id: version
         shell: pwsh
@@ -53,13 +73,6 @@ jobs:
       - name: Testes do projeto
         working-directory: navix-livre
         run: python -m unittest discover -s . -p "test*.py" -v
-
-      - name: Instalar ferramentas de compilacao
-        run: |
-          python -m pip install pyinstaller==6.16.0 pillow==11.3.0
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar dependencias Python" }
-          choco install innosetup -y --no-progress
-          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar Inno Setup" }
 
       - name: Gerar icones e imagens do instalador
         working-directory: navix-livre
@@ -126,6 +139,13 @@ jobs:
         shell: pwsh
         run: ./navix-livre/scripts/Test-WindowsInstallation.ps1 -Installer navix-livre/dist-install/NavixLivre-Setup-Windows.exe
 
+      - name: Validar estrutura MSIX com identidade exclusiva de teste
+        working-directory: navix-livre
+        shell: pwsh
+        run: |
+          python store/build_msix.py --identity-name NavixLivre.Development --publisher 'CN=Navix Development Fixture' --publisher-display-name 'Navix Development Fixture' --dist dist --output dist-store-ci/NavixLivre-TEST-ONLY.msix --source-commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Validacao MakeAppx do pacote MSIX falhou" }
+
       - name: Identificar artefato exclusivo para desenvolvimento
         working-directory: navix-livre
         shell: pwsh
@@ -159,6 +179,54 @@ jobs:
             navix-livre/assets/*
           if-no-files-found: error
           retention-days: 14
+
+  store:
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_store
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Obter o mesmo codigo testado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Instalar ferramenta de imagens
+        run: python -m pip install pillow==11.3.0
+
+      - name: Obter executaveis testados nesta execucao
+        uses: actions/download-artifact@v4
+        with:
+          name: NavixLivre-Desenvolvimento-Windows
+          path: navix-livre
+
+      - name: Gerar pacote com a identidade oficial da Store
+        working-directory: navix-livre
+        shell: pwsh
+        env:
+          NAVIX_STORE_IDENTITY_NAME: ${{ inputs.store_identity_name }}
+          NAVIX_STORE_PUBLISHER: ${{ inputs.store_publisher }}
+          NAVIX_STORE_PUBLISHER_DISPLAY_NAME: ${{ inputs.store_publisher_display_name }}
+        run: |
+          python store/build_msix.py --identity-name $env:NAVIX_STORE_IDENTITY_NAME --publisher $env:NAVIX_STORE_PUBLISHER --publisher-display-name $env:NAVIX_STORE_PUBLISHER_DISPLAY_NAME --dist dist --output dist-store/NavixLivre-Microsoft-Store.msix --source-commit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar pacote da Store; confira a identidade do Partner Center" }
+          python -c "import zipfile; from pathlib import Path; Path('dist-store/BUILD_INFO.json').write_bytes(zipfile.ZipFile('dist-store/NavixLivre-Microsoft-Store.msix').read('BUILD_INFO.json'))"
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao conferir metadados do pacote" }
+          Copy-Item PUBLICAR_NA_MICROSOFT_STORE.md,PRIVACIDADE.md dist-store
+          Set-Content dist-store/LEIA-ME.txt 'Pacote SEM assinatura destinado apenas a submissao no Partner Center. Aguarda certificacao e assinatura pela Microsoft Store. Nao e um instalador para distribuir diretamente.'
+
+      - name: Guardar pacote para submissao na Microsoft Store
+        uses: actions/upload-artifact@v4
+        with:
+          name: NavixLivre-Microsoft-Store-Submission
+          path: navix-livre/dist-store/*
+          if-no-files-found: error
+          retention-days: 30
 
   release:
     if: github.event_name == 'workflow_dispatch' && inputs.publish

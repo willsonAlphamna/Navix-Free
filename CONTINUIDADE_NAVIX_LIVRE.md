@@ -8,6 +8,17 @@
 
 ## Atualização: bloqueio SmartScreen e assinatura Windows
 
+**Continuação:** preparada uma rota alternativa MSIX/Microsoft Store, sem
+compra de certificado. `navix-livre/store/build_msix.py` gera um pacote de
+submissão com a identidade oficial do Partner Center; a CI valida também um
+pacote com identidade de teste. O workflow manual aceita `prepare_store=true`
+e os campos de identidade da Store. **Não confundir pacote de submissão sem
+assinatura com instalador pronto.** A conta do titular, a reserva do aplicativo,
+a análise e a assinatura pela Microsoft ainda estão pendentes. Roteiro em
+`navix-livre/PUBLICAR_NA_MICROSOFT_STORE.md`; política de privacidade em
+`navix-livre/PRIVACIDADE.md`. Não enviar novo link de instalação por e-mail
+antes de haver uma versão publicada e verificada.
+
 O usuário encontrou o aviso "O Windows protegeu o computador" ao abrir a
 0.3.0. O instalador exato foi baixado e conferido pelo SHA-256 registrado
 abaixo: a tabela de certificados PE tem offset=0 e size=0, confirmando

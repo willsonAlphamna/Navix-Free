@@ -53,6 +53,24 @@ própria e validação antes de publicar. Consulte as
 Nenhum certificado, assinatura paga ou serviço de nuvem está incluído por esta
 alteração no código.
 
+## Alternativa sem compra de certificado: Microsoft Store/MSIX
+
+O projeto também prepara um pacote **MSIX** para submissão na Microsoft Store.
+Nessa rota, a Microsoft assina o pacote depois da certificação. Não é necessário
+fornecer um PFX ao workflow. Isso não se aplica ao instalador EXE atual.
+
+O script `store/build_msix.py` monta o manifesto com a identidade oficial do
+Partner Center, gera ícones, empacota com validação do Windows SDK e confere
+os hashes depois de extrair o pacote. O modo de teste usa uma identidade
+exclusiva de desenvolvimento. Nenhum dos dois modos instala certificados,
+desliga proteções ou torna um MSIX sem assinatura instalável pelo usuário.
+
+O workflow aceita `prepare_store=true` e os três campos de identidade do
+aplicativo no Partner Center. O artefato resultante é para **submissão**, não
+para enviar como instalador. O titular ainda precisa concluir o cadastro,
+reservar o aplicativo e submeter o pacote à análise da Microsoft. Consulte
+[o roteiro de publicação](PUBLICAR_NA_MICROSOFT_STORE.md).
+
 ## Ordem e verificações da publicação
 
 1. Compilar `NavixLivre.exe` e `NavixBridge.exe` a partir do commit selecionado.

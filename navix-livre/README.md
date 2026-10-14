@@ -4,6 +4,12 @@ Projeto independente de código aberto (MIT), sem mensalidade e sem vinculo com 
 
 ## Instalação
 
+Estamos preparando a distribuição **MSIX pela Microsoft Store**, que assina o
+pacote após a certificação e dispensa a compra de um certificado pelo projeto.
+O pacote ainda aguarda cadastro/identidade do aplicativo e aprovação da Store;
+não há link público de instalação por essa rota neste momento. O roteiro do
+titular está em [PUBLICAR_NA_MICROSOFT_STORE.md](PUBLICAR_NA_MICROSOFT_STORE.md).
+
 **Ainda não há uma nova versão assinada pronta para instalar.** O instalador
 0.3.0 distribuído anteriormente não contém assinatura Authenticode. A 0.3.1
 está em desenvolvimento; sua publicação exige uma identidade de assinatura
