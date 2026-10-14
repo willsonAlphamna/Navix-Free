@@ -42,6 +42,17 @@ A instalacao **nao conecta automaticamente esta conversa do ChatGPT ao computado
 
 O instalador nao tem assinatura digital comercial; o Windows pode alertar sobre o executavel novo. Confira sua origem no GitHub e nao desligue antivirus. O software permanece experimental; nao foi testado no seu computador real.
 
+## Auditoria técnica e limites
+
+Leia [AUDITORIA.md](AUDITORIA.md) para resultados de testes, riscos
+de segurança e recursos que ainda não substituem o Desktop Commander.
+A interface possui ícone de pena gerado por `make_assets.py` durante
+a compilação. A barra de progresso do instalador é a do Inno Setup.
+
+O agente fornece **14 comandos MCP**. Listar processos e consultar
+metadados são somente leitura; criar pastas e mover arquivos exigem
+permissão de escrita, desligada por padrão. A ponte continua **somente local**.
+
 ## Desenvolvimento
 
 Para executar o codigo diretamente com Python 3.10+:
