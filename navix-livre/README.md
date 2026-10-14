@@ -1,64 +1,47 @@
-# Navix Livre — alternativa gratuita ao Desktop Commander
+# Navix Livre — controle local gratuito para Windows
 
-Versão experimental 0.1.0. Projeto independente, sem vínculo com os criadores do Desktop Commander.
+Projeto independente de código aberto (MIT), sem mensalidade e sem vinculo com Desktop Commander.
 
-Este é um agente MCP **LOCAL**, escrito em Python padrão, com painel Tkinter. O código usa licença MIT, não pede conta, não depende de servidores pagos e não cobra por comandos.
+## Instalação
 
-## Funções disponíveis
+O GitHub Actions gera o **NavixLivre-Setup-Windows.exe**.
 
-- Localização e listagem da Área de Trabalho, inclusive se movida ao OneDrive.
-- Pesquisa de arquivos pelo nome e leitura de texto.
-- Gravação de texto, execução de PowerShell e CMD, abertura do navegador e caminhos (opt-in).
-- Clique de mouse e captura da tela principal do Windows (opt-in).
-- Servidor MCP (JSON-RPC sobre stdin/stdout) para clientes que aceitem MCP local.
-- Diagnóstico e painel gráfico de controle.
-- Restrição de caminhos fora das pastas autorizadas.
+1. Abra o workflow **Navix Livre - Instalador Windows** no GitHub Actions deste repositorio.
+2. Escolha a execucao bem-sucedida mais recente.
+3. Em **Artifacts**, baixe **NavixLivre-Instalador-Windows**.
+4. Extraia o ZIP e execute o instalador no seu PC Windows.
+5. Abra o atalho **Navix Livre** e clique em **Listar Area de Trabalho**.
 
-## Instalar e executar no Windows
+Inclui painel NavixLivre.exe e ponte MCP local NavixBridge.exe, alem de atalhos e desinstalador. Nao necessita Python no Windows, nao inicia automaticamente com o sistema e nao deve reiniciar o PC. Veja tambem [COMO_INSTALAR.md](COMO_INSTALAR.md).
 
-Requer Windows 10 ou 11 e Python 3.10+ com Tkinter. Não instala bibliotecas extras.
+## Funcoes atuais
 
-1. Baixe a pasta navix-livre deste repositório.
-2. Execute INICIAR_PAINEL.bat.
-3. Para testar: execute VERIFICAR.bat.
+- Detecta a Area de Trabalho mesmo quando movida ao OneDrive.
+- Lista pastas e busca arquivos.
+- Le texto de arquivos de ate 1 MB.
+- Quando habilitado conscientemente: escrita de texto, PowerShell/CMD, clique do mouse, captura de tela e abertura de arquivos ou sites.
+- Painel com botoes para iniciar e parar a ponte MCP local.
+- Servidor MCP local via stdio e ponte HTTP experimental em 127.0.0.1:8765 autenticada por token.
 
-Terminal alternativo:
+## Seguranca
+
+Por padrao a ferramenta apenas le a Area de Trabalho. Escrita, comandos e controle visual ficam desligados. A ponte de rede so atende no proprio computador; nao abre porta publica. Nao abra a porta 8765 no roteador, nao use como Administrador e nao compartilhe o token de autenticacao.
+
+## Limites atuais
+
+A instalacao **nao conecta automaticamente esta conversa do ChatGPT ao computador**. Para conexao pela internet e necessario desenvolver ou configurar um canal HTTPS confiavel, autenticacao apropriada e um cliente MCP autorizado. O modulo local nao implementa OAuth completo nem substitui limites do ChatGPT. APIs e outros servicos externos podem cobrar.
+
+O instalador nao tem assinatura digital comercial; o Windows pode alertar sobre o executavel novo. Confira sua origem no GitHub e nao desligue antivirus. O software permanece experimental; nao foi testado no seu computador real.
+
+## Desenvolvimento
+
+Para executar o codigo diretamente com Python 3.10+:
 
     py -3 navix_livre.py --gui
-    py -3 navix_livre.py --doctor
     py -3 navix_livre.py --mcp
+    py -3 navix_remote.py
+    py -3 -m unittest discover -s . -p "test*.py" -v
 
-## Configuração MCP local
+As permissoes opcionais sao ativadas pelas variaveis NAVIX_ALLOWED_DIRS, NAVIX_ALLOW_WRITE, NAVIX_ALLOW_COMMANDS e NAVIX_ALLOW_UI somente em ambiente local confiavel.
 
-No cliente MCP com suporte a stdio, configure:
-- command: caminho completo de python.exe (ou py.exe)
-- args: caminho completo de navix_livre.py, seguido de --mcp
-- se utilizar py.exe, acrescente -3 no começo de args
-
-**Não** cole diretamente esse endereço num navegador. É um processo MCP local, não um site.
-
-## Permissões: desligadas por padrão
-
-Por padrão, apenas a pasta Desktop pode ser lida. Para habilitar mais capacidades, antes de executar o MCP no PowerShell:
-
-    $env:NAVIX_ALLOWED_DIRS = "$env:USERPROFILE"
-    $env:NAVIX_ALLOW_WRITE = "1"
-    $env:NAVIX_ALLOW_COMMANDS = "1"
-    $env:NAVIX_ALLOW_UI = "1"
-    py -3 navix_livre.py --mcp
-
-**Cuidado:** a permissão de comandos permite modificar e apagar arquivos da conta do Windows. Ative somente para um cliente local confiável, nunca execute como Administrador e jamais exponha o terminal diretamente à internet.
-
-## Gratuito: alcance e limites
-
-O software próprio não impõe mensalidade, licença de uso nem limite de chamadas. Todavia, energia, internet, serviços de nuvem, APIs de IA e serviços de terceiros podem cobrar. Este código **não elimina limites nem cobranças do ChatGPT**.
-
-O MCP por stdio só funciona com cliente local compatível. **Esta versão não possui relay seguro de acesso remoto via internet e não se conecta automaticamente ao ChatGPT na nuvem**. Para isso será necessária uma fase de desenvolvimento com gateway HTTPS autenticado ou VPN, sem expor comandos na rede pública.
-
-Limitações atuais: não há instalador EXE, conexão remota, controle especializado do Opera, digitação por teclado ou atualizador automático. Os testes automatizados verificam somente funções básicas; as rotinas visuais ainda precisam ser testadas em um Windows com sessão gráfica.
-
-## Testes
-
-    py -3 -m unittest test_navix -v
-
-Licença: MIT. Sem código proprietário copiado.
+Licenca MIT.
