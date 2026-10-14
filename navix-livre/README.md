@@ -1,16 +1,20 @@
-# Navix Livre 0.3 — painel Windows gratuito e código aberto
+# Navix Livre 0.3.1 em desenvolvimento — painel Windows gratuito e código aberto
 
 Projeto independente de código aberto (MIT), sem mensalidade e sem vinculo com Desktop Commander.
 
 ## Instalação
 
-O GitHub Actions gera o **NavixLivre-Setup-Windows.exe**.
+**Ainda não há uma nova versão assinada pronta para instalar.** O instalador
+0.3.0 distribuído anteriormente não contém assinatura Authenticode. A 0.3.1
+está em desenvolvimento; sua publicação exige uma identidade de assinatura
+de código confiável, ainda não disponibilizada/configurada.
 
-1. Abra o workflow **Navix Livre - Instalador Windows** no GitHub Actions deste repositorio.
-2. Escolha a execucao bem-sucedida mais recente.
-3. Em **Artifacts**, baixe **NavixLivre-Instalador-Windows**.
-4. Extraia o ZIP e execute o instalador no seu PC Windows.
-5. Abra o atalho **Navix Livre** e clique em **Listar Area de Trabalho**.
+Para uso final, baixe somente uma versão pública assinada em
+[Releases](https://github.com/willsonAlphamna/SamsungRemoteTeste/releases),
+depois de conferir assinatura, editor e SHA-256 conforme
+[COMO_INSTALAR.md](COMO_INSTALAR.md). Artefatos do GitHub Actions identificados
+como **desenvolvimento, sem assinatura** destinam-se a desenvolvedores e não
+são o instalador recomendado ao usuário.
 
 Inclui painel NavixLivre.exe e ponte MCP local NavixBridge.exe, alem de atalhos e desinstalador. Nao necessita Python no Windows, nao inicia automaticamente com o sistema e nao deve reiniciar o PC. Veja tambem [COMO_INSTALAR.md](COMO_INSTALAR.md).
 
@@ -40,7 +44,15 @@ Por padrao a ferramenta apenas le a Area de Trabalho. Escrita, comandos e contro
 
 A instalacao **nao conecta automaticamente esta conversa do ChatGPT ao computador**. Para conexao pela internet e necessario desenvolver ou configurar um canal HTTPS confiavel, autenticacao apropriada e um cliente MCP autorizado. O modulo local nao implementa OAuth completo nem substitui limites do ChatGPT. APIs e outros servicos externos podem cobrar.
 
-O instalador nao tem assinatura digital comercial; o Windows pode alertar sobre o executavel novo. Confira sua origem no GitHub e nao desligue antivirus. O software permanece experimental; nao foi testado no seu computador real.
+O software permanece experimental; a instalação no computador real do usuário
+não foi validada. Uma assinatura válida identifica o editor e protege a
+integridade, mas um arquivo novo ainda pode receber alerta de reputação do
+[SmartScreen](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
+Não desative as proteções do Windows para instalar.
+
+O fluxo da 0.3.1 separa compilações de desenvolvimento de publicação assinada.
+Consulte [ASSINATURA_WINDOWS.md](ASSINATURA_WINDOWS.md) para o diagnóstico
+da 0.3.0, a configuração necessária e os bloqueios de publicação.
 
 ## Auditoria técnica e limites
 

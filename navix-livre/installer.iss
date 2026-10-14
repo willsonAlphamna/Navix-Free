@@ -1,5 +1,7 @@
 #define MyAppName "Navix Livre"
-#define MyAppVersion "0.3.0"
+#ifndef MyAppVersion
+  #define MyAppVersion "0.3.1"
+#endif
 #define MyAppPublisher "Comunidade Navix Livre"
 
 [Setup]
@@ -25,6 +27,12 @@ RestartApplications=no
 AlwaysRestart=no
 DisableWelcomePage=no
 SetupLogging=yes
+#ifdef ReleaseSigning
+SignTool=navix
+SignedUninstaller=yes
+#else
+SignedUninstaller=no
+#endif
 
 [Languages]
 Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"

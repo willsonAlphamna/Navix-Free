@@ -13,7 +13,7 @@ import tempfile
 import urllib.parse
 import webbrowser
 
-VERSION="0.3.0"
+VERSION="0.3.1"
 def desktop():
     if os.name=="nt":
         try:

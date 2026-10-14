@@ -1,10 +1,36 @@
 # NAVIX LIVRE — REGISTRO DE CONTINUIDADE DO PROJETO
 **Atualizado em:** 14/10/2026  
 **Projeto:** Navix Livre — Windows / ponte MCP local  
-**Situação:** versão 0.3.0 compilada e testada automaticamente; acesso remoto externo e homologação no PC ainda pendentes.  
+**Situação:** 0.3.0 publicada sem assinatura; 0.3.1 em desenvolvimento com publicação condicionada a uma identidade Authenticode confiável. Acesso remoto externo e homologação no PC ainda pendentes.
 **Objetivo do registro:** permitir retomar o desenvolvimento em outras conversas sem reconstruir decisões e avanços.
 
 > Este repositório é público. NUNCA adicionar senhas, tokens de acesso, credenciais, chaves privadas, capturas pessoais ou outros dados sigilosos.
+
+## Atualização: bloqueio SmartScreen e assinatura Windows
+
+O usuário encontrou o aviso "O Windows protegeu o computador" ao abrir a
+0.3.0. O instalador exato foi baixado e conferido pelo SHA-256 registrado
+abaixo: a tabela de certificados PE tem offset=0 e size=0, confirmando
+ausência de assinatura Authenticode incorporada.
+
+A correção do fluxo de publicação está preparada para a 0.3.1:
+
+- Builds automáticos produzem somente artefatos de desenvolvimento,
+  explicitamente sem assinatura; não substituem mais uma release pública.
+- Publicação manual exige identidade de assinatura real, titular esperado,
+  assinatura e timestamp verificados no painel, ponte, instalador e
+  desinstalador, além de testes de instalação e remoção no runner Windows.
+- Cada release nova tem tag própria, commit de origem e hashes em
+  `BUILD_INFO.json`; o workflow não usa mais `--clobber`.
+- **Certificado/serviço de assinatura ainda não disponibilizado.** Não
+  apresentar a 0.3.1 como release assinada pronta para instalar. Ver
+  [configuração e limites](navix-livre/ASSINATURA_WINDOWS.md).
+- Assinatura confiável não garante reputação imediata no SmartScreen. Não
+  desativar proteções do Windows nem usar certificado autoassinado como
+  correção para distribuição pública.
+
+Os resultados e links da 0.3.0 nas seções seguintes são históricos e não
+comprovam assinatura, validação ou publicação da 0.3.1.
 
 ## 1. Endereços que importam
 - Repositório: https://github.com/willsonAlphamna/SamsungRemoteTeste
@@ -93,7 +119,7 @@ Total: **14 ferramentas MCP**, com autorização seletiva. A interface gráfica 
 
 ## 9. Roteiro para retomar com o usuário
 1. Abrir ESTE arquivo e `AUDITORIA.md`.
-2. Consultar PR #2, branch, últimos commits e última execução verde do workflow. Release 0.3.0 pode mudar se recompilada; **nunca inferir que é a mais recente sem conferir**.
+2. Consultar PR #2, branch, últimos commits e última execução verde do workflow. A 0.3.0 é histórica e sem assinatura; conferir identidade, versão, commit e hashes antes de indicar uma release nova ao usuário.
 3. Inspecionar o código antes de alegar novas funcionalidades.
 4. Se acesso remoto ao PC estiver disponível e autorizado, verificar a máquina, com ações não destrutivas primeiro; caso haja limite do Desktop Commander, não afirmar que consegue controlar o Windows.
 5. Confirmar se versão instalada corresponde ao checksum/commit auditado.

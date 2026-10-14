@@ -69,7 +69,7 @@ class TestNavix(unittest.TestCase):
     def test_modern_gui_code(self):
         path=Path(navix_gui.__file__)
         ast.parse(path.read_text(encoding='utf-8'))
-        self.assertEqual(VERSION,'0.3.0')
+        self.assertRegex(VERSION,r'^\d+\.\d+\.\d+$')
         for method in ('build_files','build_terminal','build_processes','build_capture','build_settings','start_bridge'):
             self.assertTrue(callable(getattr(navix_gui.NavixWindow,method)))
     def test_mcp(self):

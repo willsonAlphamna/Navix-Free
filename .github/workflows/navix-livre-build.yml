@@ -6,19 +6,31 @@ on:
     paths:
       - "navix-livre/**"
       - ".github/workflows/navix-livre-build.yml"
+  pull_request:
+    paths:
+      - "navix-livre/**"
+      - ".github/workflows/navix-livre-build.yml"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publicar nova versao assinada (exige identidade configurada)"
+        type: boolean
+        required: true
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.publish || false }}
+  cancel-in-progress: ${{ !inputs.publish }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: windows-latest
     timeout-minutes: 25
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Obter codigo
         uses: actions/checkout@v4
@@ -28,6 +40,16 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Conferir versao unica
+        id: version
+        shell: pwsh
+        run: |
+          $version = (& python -c "import sys; sys.path.insert(0, 'navix-livre'); from navix_livre import VERSION; print(VERSION)").Trim()
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw "Versao invalida" }
+          $installer = Get-Content navix-livre/installer.iss -Raw
+          if (-not $installer.Contains('#define MyAppVersion "' + $version + '"')) { throw "Versoes do programa e instalador divergem" }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Testes do projeto
         working-directory: navix-livre
         run: python -m unittest discover -s . -p "test*.py" -v
@@ -35,7 +57,9 @@ jobs:
       - name: Instalar ferramentas de compilacao
         run: |
           python -m pip install pyinstaller==6.16.0 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar dependencias Python" }
           choco install innosetup -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao instalar Inno Setup" }
 
       - name: Gerar icones e imagens do instalador
         working-directory: navix-livre
@@ -49,20 +73,15 @@ jobs:
         working-directory: navix-livre
         shell: pwsh
         run: |
-          $app = (Resolve-Path ".\\dist\\NavixLivre.exe").Path
+          $app = (Resolve-Path ".\dist\NavixLivre.exe").Path
           $processo = Start-Process -FilePath $app -PassThru
           try {
             Start-Sleep -Seconds 9
             $processo.Refresh()
-            if ($processo.HasExited) {
-              throw "Painel terminou inesperadamente com codigo $($processo.ExitCode)"
-            }
-            Write-Host "Painel Windows iniciou e permaneceu ativo."
+            if ($processo.HasExited) { throw "Painel terminou inesperadamente: $($processo.ExitCode)" }
           } finally {
             $processo.Refresh()
-            if (-not $processo.HasExited) {
-              Stop-Process -Id $processo.Id -Force
-            }
+            if (-not $processo.HasExited) { Stop-Process -Id $processo.Id -Force }
           }
 
       - name: Compilar ponte local MCP
@@ -74,87 +93,227 @@ jobs:
         shell: pwsh
         run: |
           $path = & ".\dist\NavixBridge.exe" --show-token-path
-          if ($LASTEXITCODE -ne 0 -or -not ($path -match 'bridge.token')) {
-            throw "O executavel da ponte falhou."
-          }
-          Write-Host "Ponte local OK; segredo nao exibido."
+          if ($LASTEXITCODE -ne 0 -or -not ($path -match 'bridge.token')) { throw "Ponte falhou" }
 
-      - name: Criar instalador
+      - name: Criar instalador de desenvolvimento sem publicacao
         working-directory: navix-livre
         shell: pwsh
         run: |
-          $compiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-          if (-not (Test-Path $compiler)) {
-            throw "Compilador Inno Setup nao encontrado"
-          }
-          & $compiler "installer.iss"
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' installer.iss
           if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar instalador" }
-          if (-not (Test-Path ".\dist-install\NavixLivre-Setup-Windows.exe")) { throw "Instalador nao criado" }
+
+      - name: Testar scripts e recusa de assinatura ausente
+        shell: pwsh
+        run: |
+          foreach ($file in Get-ChildItem navix-livre/scripts/*.ps1) {
+            $parseErrors = $null
+            $tokens = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors.Count -gt 0) { throw ($parseErrors | Out-String) }
+          }
+          $file = 'navix-livre/dist-install/NavixLivre-Setup-Windows.exe'
+          if ((Get-AuthenticodeSignature -LiteralPath $file).Status -ne 'NotSigned') { throw "Fixture deve ser nao assinada" }
+          try {
+            & ./navix-livre/scripts/Test-WindowsSignature.ps1 -Path $file -ExpectedPublisher 'CN=Navix CI rejection test'
+          } catch {
+            if ($_.Exception.Message -notlike 'Assinatura Authenticode invalida ou ausente*') { throw }
+            Write-Host 'Publicacao de executavel nao assinado recusada corretamente.'
+            exit 0
+          }
+          throw "ERRO: verificador aceitou arquivo nao assinado"
 
       - name: Testar instalacao e desinstalacao no runner
+        shell: pwsh
+        run: ./navix-livre/scripts/Test-WindowsInstallation.ps1 -Installer navix-livre/dist-install/NavixLivre-Setup-Windows.exe
+
+      - name: Identificar artefato exclusivo para desenvolvimento
         working-directory: navix-livre
         shell: pwsh
+        env:
+          NAVIX_BUILD_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          $setup = (Resolve-Path ".\dist-install\NavixLivre-Setup-Windows.exe").Path
-          $processo = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT","/NORESTART" -Wait -PassThru
-          if ($processo.ExitCode -ne 0) { throw "Falha ao instalar" }
-          $target = Join-Path $env:LOCALAPPDATA "Programs\NavixLivre"
-          if (-not (Test-Path (Join-Path $target "NavixLivre.exe"))) { throw "Painel nao instalado" }
-          if (-not (Test-Path (Join-Path $target "NavixBridge.exe"))) { throw "Ponte nao instalada" }
-          $uninstall = Join-Path $target "unins000.exe"
-          if (-not (Test-Path $uninstall)) { throw "Desinstalador ausente" }
-          $secretFolder = Join-Path $env:LOCALAPPDATA "NavixLivre"
-          New-Item -ItemType Directory -Path $secretFolder -Force | Out-Null
-          Set-Content -Path (Join-Path $secretFolder "bridge.token") -Value "fake-test-secret-only"
-          $un = Start-Process -FilePath $uninstall -ArgumentList "/VERYSILENT","/NORESTART" -Wait -PassThru
-          if ($un.ExitCode -ne 0) { throw "Falha ao desinstalar" }
-          if (Test-Path (Join-Path $target "NavixLivre.exe")) { throw "Painel permaneceu instalado" }
-          if (Test-Path (Join-Path $target "NavixBridge.exe")) { throw "Ponte permaneceu instalada" }
-          if (Test-Path (Join-Path $secretFolder "bridge.token")) { throw "Credencial permaneceu apos desinstalacao" }
+          @{
+            version = $env:NAVIX_BUILD_VERSION
+            source_commit = $env:GITHUB_SHA
+            signing_status = 'unsigned-development-only'
+          } | ConvertTo-Json | Set-Content dist-install/BUILD_INFO.json -Encoding utf8
+          Set-Content dist-install/NAO_E_RELEASE.txt 'Compilacao de desenvolvimento SEM assinatura. Nao distribuir como instalador aprovado. Use somente releases assinadas para instalacao pelo usuario.'
+          $hash = (Get-FileHash dist-install/NavixLivre-Setup-Windows.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content dist-install/SHA256.txt "$hash  NavixLivre-Setup-Windows.exe" -Encoding ascii
 
-      - name: Calcular SHA-256 do instalador
-        working-directory: navix-livre
-        shell: pwsh
-        run: |
-          $asset = ".\\dist-install\\NavixLivre-Setup-Windows.exe"
-          $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
-          Set-Content -Path ".\\dist-install\\SHA256.txt" -Value "$hash  NavixLivre-Setup-Windows.exe" -Encoding ascii
-
-      - name: Publicar instalador
+      - name: Guardar instalador de desenvolvimento
         uses: actions/upload-artifact@v4
         with:
-          name: NavixLivre-Instalador-Windows
+          name: NavixLivre-Instalador-Desenvolvimento-Windows
           path: navix-livre/dist-install/*
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
 
-      - name: Publicar portatil
+      - name: Guardar executaveis e imagens para a etapa de assinatura
         uses: actions/upload-artifact@v4
         with:
-          name: NavixLivre-Portatil-Windows
+          name: NavixLivre-Desenvolvimento-Windows
           path: |
             navix-livre/dist/NavixLivre.exe
             navix-livre/dist/NavixBridge.exe
-            navix-livre/README.md
-            navix-livre/COMO_INSTALAR.md
+            navix-livre/assets/*
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
 
-      - name: Publicar release para download permanente
-        if: github.ref == 'refs/heads/feature/navix-livre-mcp'
-        continue-on-error: true
+  release:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 20
+    environment: windows-release
+    concurrency:
+      group: navix-livre-release-${{ needs.build.outputs.version }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    env:
+      NAVIX_EXPECTED_PUBLISHER: ${{ vars.NAVIX_SIGNING_PUBLISHER }}
+      NAVIX_BUILD_VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - name: Obter o mesmo codigo testado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Exigir identidade e versao nova antes de publicar
+        shell: pwsh
+        env:
+          NAVIX_SIGNING_CERTIFICATE_BASE64: ${{ secrets.NAVIX_SIGNING_CERTIFICATE_BASE64 }}
+          NAVIX_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.NAVIX_SIGNING_CERTIFICATE_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ($env:GITHUB_REF -ne 'refs/heads/feature/navix-livre-mcp') { throw "Publicacao permitida somente na branch revisada do Navix" }
+          if ([string]::IsNullOrWhiteSpace($env:NAVIX_SIGNING_CERTIFICATE_BASE64) -or
+              [string]::IsNullOrWhiteSpace($env:NAVIX_SIGNING_CERTIFICATE_PASSWORD) -or
+              [string]::IsNullOrWhiteSpace($env:NAVIX_EXPECTED_PUBLISHER)) {
+            throw "Publicacao bloqueada: configure uma identidade Authenticode confiavel e o titular esperado no ambiente windows-release. Consulte ASSINATURA_WINDOWS.md."
+          }
+          $tag = "navix-livre-v$env:NAVIX_BUILD_VERSION"
+          $existing = git ls-remote --tags origin "refs/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { throw "Nao foi possivel conferir a tag remota" }
+          if ($existing) { throw "Tag existente: crie uma nova versao; nao substituir o instalador publicado" }
+
+      - name: Obter os executaveis testados nesta execucao
+        uses: actions/download-artifact@v4
+        with:
+          name: NavixLivre-Desenvolvimento-Windows
+          path: navix-livre
+
+      - name: Importar identidade de assinatura temporaria
+        shell: pwsh
+        env:
+          NAVIX_SIGNING_CERTIFICATE_BASE64: ${{ secrets.NAVIX_SIGNING_CERTIFICATE_BASE64 }}
+          NAVIX_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.NAVIX_SIGNING_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'navix-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:NAVIX_SIGNING_CERTIFICATE_BASE64))
+            $password = ConvertTo-SecureString $env:NAVIX_SIGNING_CERTIFICATE_PASSWORD -AsPlainText -Force
+            $certificates = @(Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password)
+            $private = @($certificates | Where-Object HasPrivateKey)
+            if ($private.Count -ne 1) {
+              foreach ($cert in $private) { Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -DeleteKey -Force }
+              throw "O PFX deve conter exatamente uma identidade de assinatura"
+            }
+            "NAVIX_SIGNING_THUMBPRINT=$($private[0].Thumbprint)" >> $env:GITHUB_ENV
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Assinar e verificar painel e ponte
+        working-directory: navix-livre
+        shell: pwsh
+        run: ./scripts/Sign-WindowsArtifacts.ps1 -Path @('dist/NavixLivre.exe', 'dist/NavixBridge.exe') -ExpectedPublisher $env:NAVIX_EXPECTED_PUBLISHER
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Criar instalador e desinstalador assinados
+        working-directory: navix-livre
+        shell: pwsh
+        run: |
+          $script = (Resolve-Path scripts/Sign-WindowsArtifacts.ps1).Path
+          # $f e expandido e protegido por aspas pelo Inno Setup.
+          # O script le o titular do ambiente, sem interpolacao de comandos.
+          $pwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
+          $signer = '"' + $pwsh + '" -NoProfile -NonInteractive -File "' + $script + '" -Path $f'
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' '/DReleaseSigning=1' "/DMyAppVersion=$env:NAVIX_BUILD_VERSION" "/Snavix=$signer" installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao gerar instalador assinado" }
+          ./scripts/Test-WindowsSignature.ps1 -Path dist-install/NavixLivre-Setup-Windows.exe -ExpectedPublisher $env:NAVIX_EXPECTED_PUBLISHER
+
+      - name: Conferir assinaturas instaladas e desinstalacao
+        shell: pwsh
+        run: ./navix-livre/scripts/Test-WindowsInstallation.ps1 -Installer navix-livre/dist-install/NavixLivre-Setup-Windows.exe -ExpectedPublisher $env:NAVIX_EXPECTED_PUBLISHER
+
+      - name: Registrar origem e hashes dos arquivos assinados
+        working-directory: navix-livre
+        shell: pwsh
+        run: |
+          $files = @('dist/NavixLivre.exe', 'dist/NavixBridge.exe', 'dist-install/NavixLivre-Setup-Windows.exe')
+          $hashes = @{}
+          foreach ($file in $files) { $hashes[[IO.Path]::GetFileName($file)] = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant() }
+          @{
+            version = $env:NAVIX_BUILD_VERSION
+            source_commit = $env:GITHUB_SHA
+            signing_status = 'authenticode-verified'
+            publisher_subject = $env:NAVIX_EXPECTED_PUBLISHER
+            sha256 = $hashes
+          } | ConvertTo-Json -Depth 3 | Set-Content dist-install/BUILD_INFO.json -Encoding utf8
+          $hash = $hashes['NavixLivre-Setup-Windows.exe']
+          Set-Content dist-install/SHA256.txt "$hash  NavixLivre-Setup-Windows.exe" -Encoding ascii
+
+      - name: Criar rascunho de nova release sem sobrescrever arquivos
         working-directory: navix-livre
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "navix-livre-v0.3.0"
-          $installer = "dist-install\\NavixLivre-Setup-Windows.exe"
-          $checksum = "dist-install\\SHA256.txt"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $installer $checksum --clobber
-          } else {
-            gh release create $tag $installer $checksum --target $env:GITHUB_SHA --title "Navix Livre 0.3.0 - Windows" --notes "Instalador gratuito do Navix Livre para Windows. Inclui painel escuro com arquivos, terminal e processos, ponte MCP local e desinstalador. A conexao remota ao ChatGPT nao e automatica."
+          $tag = "navix-livre-v$env:NAVIX_BUILD_VERSION"
+          $notes = @"
+          Instalador Windows com assinatura Authenticode, titular e carimbo de tempo verificados.
+          Commit de origem: $env:GITHUB_SHA
+          A assinatura nao garante reputacao imediata no SmartScreen.
+          Esta versao nao conecta automaticamente esta conversa do ChatGPT ao PC.
+          "@
+          $notesPath = Join-Path $env:RUNNER_TEMP 'navix-release-notes.md'
+          Set-Content $notesPath $notes -Encoding utf8
+          gh release create $tag dist-install/NavixLivre-Setup-Windows.exe dist-install/SHA256.txt dist-install/BUILD_INFO.json --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "Navix Livre $env:NAVIX_BUILD_VERSION - Windows" --notes-file $notesPath --draft
+          if ($LASTEXITCODE -ne 0) { throw "Falha em criar rascunho de release" }
+
+      - name: Verificar o download publicado antes de aprovar a entrega
+        working-directory: navix-livre
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $download = Join-Path $env:RUNNER_TEMP 'navix-published'
+          gh release download "navix-livre-v$env:NAVIX_BUILD_VERSION" --repo $env:GITHUB_REPOSITORY --pattern NavixLivre-Setup-Windows.exe --dir $download
+          if ($LASTEXITCODE -ne 0) { throw "Falha ao baixar instalador publicado" }
+          $file = Join-Path $download 'NavixLivre-Setup-Windows.exe'
+          if ((Get-FileHash $file -Algorithm SHA256).Hash -ne (Get-FileHash dist-install/NavixLivre-Setup-Windows.exe -Algorithm SHA256).Hash) {
+            throw "Download publicado difere do instalador aprovado"
           }
-          if ($LASTEXITCODE -ne 0) { throw "Falha em publicar release" }
+          ./scripts/Test-WindowsSignature.ps1 -Path $file -ExpectedPublisher $env:NAVIX_EXPECTED_PUBLISHER
+
+      - name: Tornar publica somente a release verificada
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "navix-livre-v$env:NAVIX_BUILD_VERSION" --repo $env:GITHUB_REPOSITORY --draft=false
+          if ($LASTEXITCODE -ne 0) { throw "Falha em publicar release verificada" }
+
+      - name: Remover a chave privada do runner
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:NAVIX_SIGNING_THUMBPRINT -match '^[0-9A-Fa-f]{40}$') {
+            $path = "Cert:\CurrentUser\My\$env:NAVIX_SIGNING_THUMBPRINT"
+            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -DeleteKey -Force }
+          }
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'navix-signing.pfx') -Force -ErrorAction SilentlyContinue
