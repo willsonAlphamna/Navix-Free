@@ -29,6 +29,10 @@ class NavixWindow:
         self.root.geometry("1230x760")
         self.root.minsize(890,590)
         self.root.configure(bg=BG)
+        try:
+            resource=Path(getattr(sys,"_MEIPASS",Path(__file__).parent))/"navix.ico"
+            if resource.is_file(): self.root.iconbitmap(default=str(resource))
+        except (OSError,tk.TclError): pass
         self.bridge=None
         self.location=agent.desktop
         self.records={}
@@ -57,7 +61,7 @@ class NavixWindow:
         emblem=tk.Canvas(header,width=44,height=44,bg=PANEL,highlightthickness=0)
         emblem.pack(side="left",padx=(20,12),pady=13)
         emblem.create_rectangle(2,2,42,42,fill=BLUE,outline="",width=0)
-        emblem.create_text(22,22,text="N",fill="white",font=("Segoe UI",25,"bold"))
+        emblem.create_text(22,22,text="✒",fill="white",font=("Segoe UI Symbol",23,"bold"))
         htext=tk.Frame(header,bg=PANEL)
         htext.pack(side="left")
         self.label(htext,"Navix Livre",19,bold=True,bg=PANEL).pack(anchor="w")
