@@ -50,20 +50,33 @@ class Agent:
         p=self.safe(path)
         if not p.is_dir(): raise NotADirectoryError(str(p))
         out=[]
-        for item in sorted(p.iterdir(),key=lambda x:x.name.casefold())[:500]:
+        items=sorted(p.iterdir(),key=lambda x:x.name.casefold())
+        for item in items[:500]:
             try:
                 q=self.safe(item)
                 out.append(dict(nome=item.name,pasta=q.is_dir()))
             except PermissionError: out.append(dict(nome=item.name,restrito=True))
-        return dict(caminho=str(p),arquivos=out)
+        return dict(caminho=str(p),arquivos=out,truncado=len(items)>500)
     def search_files(self,path=None,term="",limit=50):
         p=self.safe(path)
         if not p.is_dir(): raise NotADirectoryError(str(p))
         limit=max(1,min(100,int(limit)))
         hits=[]
+        visited=0
+        quota=30000  # evita varrer um HD inteiro num PC de poucos recursos
         for root,dirs,files in os.walk(p,followlinks=False):
-            dirs[:]=[d for d in dirs if not (Path(root)/d).is_symlink()]
+            current=Path(root)
+            try:
+                self.safe(current)
+            except PermissionError:
+                dirs.clear()
+                continue
+            dirs[:]=[d for d in dirs if not (current/d).is_symlink()
+                     and (current/d).resolve().is_relative_to(p)]
             for name in dirs+files:
+                visited+=1
+                if visited>quota:
+                    return dict(resultados=hits,limite=True,motivo="limite de varredura")
                 if term.casefold() in name.casefold():
                     try: hits.append(str(self.safe(Path(root)/name)))
                     except PermissionError: continue
@@ -71,8 +84,15 @@ class Agent:
         return dict(resultados=hits,limite=False)
     def read_text(self,path):
         p=self.safe(path)
-        if p.stat().st_size>1_000_000: raise ValueError("Arquivo maior que 1MB")
-        return dict(arquivo=str(p),texto=p.read_text(encoding="utf-8-sig"))
+        # Leitura limitada de verdade, mesmo se o arquivo aumentar após stat().
+        with p.open("rb") as handle:
+            raw=handle.read(1_000_001)
+        if len(raw)>1_000_000: raise ValueError("Arquivo maior que 1MB")
+        try: value=raw.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError("Arquivo nao e texto UTF-8") from exc
+        if "\x00" in value: raise ValueError("Arquivo binario nao suportado")
+        return dict(arquivo=str(p),texto=value)
     def write_text(self,path,text):
         if not self.write: raise PermissionError("Ative NAVIX_ALLOW_WRITE=1")
         if len(text.encode("utf-8"))>1_000_000: raise ValueError("Texto maior que 1MB")
