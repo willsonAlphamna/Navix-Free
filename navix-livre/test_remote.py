@@ -49,6 +49,10 @@ class TestBridge(unittest.TestCase):
         self.assertEqual(code,200)
         names={item["name"] for item in payload["result"]["tools"]}
         self.assertIn("list_directory",names)
+        self.assertIn("get_file_info",names)
+        self.assertIn("list_processes",names)
+        self.assertNotIn("create_directory",names)
+        self.assertNotIn("move_file",names)
         self.assertNotIn("run_command",names)
         self.assertNotIn("write_text",names)
         self.assertNotIn("click",names)
