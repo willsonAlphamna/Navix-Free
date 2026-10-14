@@ -76,7 +76,7 @@ def make_handler(agent,token):
             allowed={"status","list_directory","search_files","read_text","get_file_info","list_processes"}
             if agent.write: allowed.update({"write_text","create_directory","move_file"})
             if agent.commands: allowed.add("run_command")
-            if agent.ui: allowed.update({"open_url","open_path","click","screenshot"})
+            if agent.ui: allowed.update({"open_url","open_path","click","screenshot","type_text","drag_mouse"})
             return allowed
         def do_POST(self):
             if self.path!="/mcp":
