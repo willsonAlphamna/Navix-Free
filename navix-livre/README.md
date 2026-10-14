@@ -1,4 +1,4 @@
-# Navix Livre 0.3.1 em desenvolvimento — painel Windows gratuito e código aberto
+# Navix Free 0.3.1 em desenvolvimento — painel Windows gratuito e código aberto
 
 Projeto independente de código aberto (MIT), sem mensalidade e sem vinculo com Desktop Commander.
 
@@ -16,7 +16,7 @@ está em desenvolvimento; sua publicação exige uma identidade de assinatura
 de código confiável, ainda não disponibilizada/configurada.
 
 Para uso final, baixe somente uma versão pública assinada em
-[Releases](https://github.com/willsonAlphamna/SamsungRemoteTeste/releases),
+[Releases](https://github.com/willsonAlphamna/Navix-Free/releases),
 depois de conferir assinatura, editor e SHA-256 conforme
 [COMO_INSTALAR.md](COMO_INSTALAR.md). Artefatos do GitHub Actions identificados
 como **desenvolvimento, sem assinatura** destinam-se a desenvolvedores e não
