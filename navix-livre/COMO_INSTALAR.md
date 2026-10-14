@@ -15,9 +15,9 @@
 5. Ao final, abra o atalho **Navix Livre**.
 
 ## 3. Testar
-1. Clique em **Listar Área de Trabalho** para ver pastas e arquivos.
-2. Clique em **Diagnóstico** para verificar permissões.
-3. Clique em **Iniciar conexão MCP local**. Abre uma janela de console da ponte. Deixe essa janela aberta durante o teste.
+1. Na aba **Arquivos**, confira a pasta Área de Trabalho e abra pastas com dois cliques.
+2. Na aba **Configurações**, confira as permissões (escrita e terminal vêm bloqueados por padrão).
+3. Na aba **Configurações**, clique em **Iniciar ponte MCP local**. Abre uma janela de console da ponte. Deixe essa janela aberta durante o teste.
 4. O endereço local é http://127.0.0.1:8765/mcp, mas a página não abre como site comum. É um endpoint MCP e exige autenticação.
 5. Para encerrar, clique em **Parar conexão MCP local** (se iniciou pelo painel) ou feche a janela da ponte.
 6. Se a conexão local falhar, copie apenas a mensagem de erro, sem compartilhar credenciais.
