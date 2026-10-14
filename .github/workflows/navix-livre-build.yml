@@ -184,7 +184,7 @@ jobs:
           retention-days: 14
 
   store:
-    if: github.event_name == 'workflow_dispatch' && inputs.prepare_store
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.prepare_store)
     needs: build
     runs-on: windows-latest
     timeout-minutes: 10
@@ -212,9 +212,9 @@ jobs:
         working-directory: navix-livre
         shell: pwsh
         env:
-          NAVIX_STORE_IDENTITY_NAME: ${{ inputs.store_identity_name }}
-          NAVIX_STORE_PUBLISHER: ${{ inputs.store_publisher }}
-          NAVIX_STORE_PUBLISHER_DISPLAY_NAME: ${{ inputs.store_publisher_display_name }}
+          NAVIX_STORE_IDENTITY_NAME: ${{ inputs.store_identity_name || 'WILSONNEVESDEALMEIDA.NavixFree' }}
+          NAVIX_STORE_PUBLISHER: ${{ inputs.store_publisher || 'CN=C2E41445-F202-4F8A-9C50-01FF70428979' }}
+          NAVIX_STORE_PUBLISHER_DISPLAY_NAME: ${{ inputs.store_publisher_display_name || 'WILSON NEVES DE ALMEIDA' }}
         run: |
           python store/build_msix.py --identity-name $env:NAVIX_STORE_IDENTITY_NAME --publisher $env:NAVIX_STORE_PUBLISHER --publisher-display-name $env:NAVIX_STORE_PUBLISHER_DISPLAY_NAME --dist dist --output dist-store/NavixLivre-Microsoft-Store.msix --source-commit $env:GITHUB_SHA
           if ($LASTEXITCODE -ne 0) { throw "Falha ao preparar pacote da Store; confira a identidade do Partner Center" }
