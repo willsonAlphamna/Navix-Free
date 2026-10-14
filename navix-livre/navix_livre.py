@@ -45,7 +45,7 @@ class Agent:
         return dict(nome="Navix Livre",versao=VERSION,computador=platform.node(),
                     sistema=platform.platform(),desktop=str(self.desktop),
                     pastas=[str(r) for r in self.roots],escrita=self.write,
-                    terminal=self.commands,controle_visual=self.ui,rede="sem portas abertas")
+                    terminal=self.commands,controle_visual=self.ui,rede="rede publica fechada; ponte local opcional")
     def list_directory(self,path=None):
         p=self.safe(path)
         if not p.is_dir(): raise NotADirectoryError(str(p))
