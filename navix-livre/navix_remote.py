@@ -39,12 +39,20 @@ def make_handler(agent,token):
             self.send_response(code)
             self.send_header("Cache-Control","no-store")
             self.send_header("X-Content-Type-Options","nosniff")
+            self.send_header("Referrer-Policy","no-referrer")
+            self.send_header("X-Frame-Options","DENY")
             self.send_header("Content-Type","application/json; charset=utf-8")
             self.send_header("Content-Length",str(len(data)))
             for k,v in (extra or {}).items(): self.send_header(k,v)
             self.end_headers()
             if data: self.wfile.write(data)
         def authorized(self):
+            # Defesa adicional contra DNS rebinding: a ponte só aceita
+            # cabeçalhos Host explícitos de loopback.
+            host=self.headers.get("Host","").split(":")[0].lower()
+            if host not in ("127.0.0.1","localhost"):
+                self.respond(403,{"error":"Host nao autorizado"})
+                return False
             auth=self.headers.get("Authorization","")
             supplied=auth[7:] if auth.startswith("Bearer ") else ""
             if not hmac.compare_digest(supplied,token):
@@ -55,6 +63,10 @@ def make_handler(agent,token):
                 return False
             return True
         def do_GET(self):
+            if self.path=="/mcp":
+                if not self.authorized(): return
+                self.respond(405,{"error":"GET SSE nao implementado"},{"Allow":"POST"})
+                return
             if self.path!="/health":
                 self.respond(404,{"error":"Rota inexistente"})
                 return
@@ -87,6 +99,7 @@ def make_handler(agent,token):
                     self.respond(202)
                     return
                 method=msg.get("method")
+                if not isinstance(method,str): raise ValueError("Metodo JSON-RPC invalido")
                 if method=="initialize":
                     proto=(msg.get("params") or {}).get("protocolVersion","2025-03-26")
                     if proto not in ("2024-11-05","2025-03-26","2025-06-18"): proto="2025-03-26"
