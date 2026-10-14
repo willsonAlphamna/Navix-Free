@@ -95,8 +95,14 @@ jobs:
           if (-not (Test-Path (Join-Path $target "NavixBridge.exe"))) { throw "Ponte nao instalada" }
           $uninstall = Join-Path $target "unins000.exe"
           if (-not (Test-Path $uninstall)) { throw "Desinstalador ausente" }
+          $secretFolder = Join-Path $env:LOCALAPPDATA "NavixLivre"
+          New-Item -ItemType Directory -Path $secretFolder -Force | Out-Null
+          Set-Content -Path (Join-Path $secretFolder "bridge.token") -Value "fake-test-secret-only"
           $un = Start-Process -FilePath $uninstall -ArgumentList "/VERYSILENT","/NORESTART" -Wait -PassThru
           if ($un.ExitCode -ne 0) { throw "Falha ao desinstalar" }
+          if (Test-Path (Join-Path $target "NavixLivre.exe")) { throw "Painel permaneceu instalado" }
+          if (Test-Path (Join-Path $target "NavixBridge.exe")) { throw "Ponte permaneceu instalada" }
+          if (Test-Path (Join-Path $secretFolder "bridge.token")) { throw "Credencial permaneceu apos desinstalacao" }
 
       - name: Calcular SHA-256 do instalador
         working-directory: navix-livre
