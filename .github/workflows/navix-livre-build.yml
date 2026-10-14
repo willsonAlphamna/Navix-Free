@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -78,11 +78,19 @@ jobs:
           $un = Start-Process -FilePath $uninstall -ArgumentList "/VERYSILENT","/NORESTART" -Wait -PassThru
           if ($un.ExitCode -ne 0) { throw "Falha ao desinstalar" }
 
+      - name: Calcular SHA-256 do instalador
+        working-directory: navix-livre
+        shell: pwsh
+        run: |
+          $asset = ".\\dist-install\\NavixLivre-Setup-Windows.exe"
+          $hash = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content -Path ".\\dist-install\\SHA256.txt" -Value "$hash  NavixLivre-Setup-Windows.exe" -Encoding ascii
+
       - name: Publicar instalador
         uses: actions/upload-artifact@v4
         with:
           name: NavixLivre-Instalador-Windows
-          path: navix-livre/dist-install/NavixLivre-Setup-Windows.exe
+          path: navix-livre/dist-install/*
           if-no-files-found: error
           retention-days: 90
 
@@ -94,5 +102,25 @@ jobs:
             navix-livre/dist/NavixLivre.exe
             navix-livre/dist/NavixBridge.exe
             navix-livre/README.md
+            navix-livre/COMO_INSTALAR.md
           if-no-files-found: error
           retention-days: 90
+
+      - name: Publicar release para download permanente
+        if: github.ref == 'refs/heads/feature/navix-livre-mcp'
+        continue-on-error: true
+        working-directory: navix-livre
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "navix-livre-v0.2.0"
+          $installer = "dist-install\\NavixLivre-Setup-Windows.exe"
+          $checksum = "dist-install\\SHA256.txt"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $installer $checksum --clobber
+          } else {
+            gh release create $tag $installer $checksum --target $env:GITHUB_SHA --title "Navix Livre 0.2.0 - Windows" --notes "Instalador gratuito do Navix Livre para Windows. Inclui painel, ponte MCP local e desinstalador. A conexao remota ao ChatGPT nao e automatica."
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Falha em publicar release" }
