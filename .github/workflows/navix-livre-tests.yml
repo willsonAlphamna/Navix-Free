@@ -1,0 +1,24 @@
+name: Navix Livre - testes
+on:
+  push:
+    branches: ["feature/navix-livre-mcp"]
+  pull_request:
+    paths:
+      - "navix-livre/**"
+      - ".github/workflows/navix-livre-tests.yml"
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Executar testes
+        working-directory: navix-livre
+        run: python -m unittest test_navix -v
+      - name: Diagnostico
+        working-directory: navix-livre
+        run: python navix_livre.py --doctor
