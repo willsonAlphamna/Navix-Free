@@ -171,6 +171,53 @@ class Agent:
         d,e=(2,4) if button=="left" else (8,16)
         u.mouse_event(d,0,0,0,0); u.mouse_event(e,0,0,0,0)
         return dict(clique=[x,y],botao=button)
+    def type_text(self,text):
+        if not self.ui: raise PermissionError("Ative NAVIX_ALLOW_UI=1")
+        if os.name!="nt": raise RuntimeError("Windows necessario")
+        if not isinstance(text,str) or not 1<=len(text)<=4000:
+            raise ValueError("Texto deve conter de 1 a 4000 caracteres")
+        # SendInput/KEYEVENTF_UNICODE: texto para a janela ativa, sem clipboard.
+        from ctypes import wintypes
+        pointer_size=ctypes.sizeof(ctypes.c_void_p)
+        extra=ctypes.c_ulonglong if pointer_size==8 else ctypes.c_ulong
+        class KEYBDINPUT(ctypes.Structure):
+            _fields_=[("wVk",wintypes.WORD),("wScan",wintypes.WORD),
+                      ("dwFlags",wintypes.DWORD),("time",wintypes.DWORD),("dwExtraInfo",extra)]
+        class INPUT(ctypes.Structure):
+            _fields_=[("type",wintypes.DWORD),("ki",KEYBDINPUT)]
+        user32=ctypes.windll.user32
+        user32.SendInput.argtypes=[wintypes.UINT,ctypes.POINTER(INPUT),ctypes.c_int]
+        user32.SendInput.restype=wintypes.UINT
+        for ch in text:
+            encoded=ch.encode("utf-16-le")
+            for i in range(0,len(encoded),2):
+                code=int.from_bytes(encoded[i:i+2],"little")
+                events=(INPUT(1,KEYBDINPUT(0,code,4,0,0)),
+                        INPUT(1,KEYBDINPUT(0,code,6,0,0)))
+                packet=(INPUT*2)(*events)
+                if user32.SendInput(2,packet,ctypes.sizeof(INPUT))!=2:
+                    raise OSError("Falha de SendInput; janela talvez seja privilegiada")
+        return dict(digitado_caracteres=len(text))
+
+    def drag_mouse(self,x1,y1,x2,y2):
+        if not self.ui: raise PermissionError("Ative NAVIX_ALLOW_UI=1")
+        if os.name!="nt": raise RuntimeError("Windows necessario")
+        coords=[int(v) for v in (x1,y1,x2,y2)]
+        if any(v<0 or v>20000 for v in coords): raise ValueError("Coordenadas invalidas")
+        import time
+        u=ctypes.windll.user32
+        if not u.SetCursorPos(coords[0],coords[1]): raise OSError("Falha ao posicionar mouse")
+        u.mouse_event(2,0,0,0,0)
+        try:
+            for step in range(1,11):
+                x=round(coords[0]+(coords[2]-coords[0])*step/10)
+                y=round(coords[1]+(coords[3]-coords[1])*step/10)
+                if not u.SetCursorPos(x,y): raise OSError("Falha durante arraste")
+                time.sleep(0.02)
+        finally:
+            u.mouse_event(4,0,0,0,0)
+        return dict(origem=coords[:2],destino=coords[2:])
+
     def screenshot(self):
         if not self.ui: raise PermissionError("Ative NAVIX_ALLOW_UI=1")
         if os.name!="nt": raise RuntimeError("Windows necessario")
@@ -208,7 +255,9 @@ SPECS=[
  ("open_url","Abre navegador, opcional",{"url":"string"},["url"]),
  ("open_path","Abre arquivo/pasta, opcional",{"path":"string"},["path"]),
  ("click","Clica no mouse, opcional",{"x":"integer","y":"integer","button":"string"},["x","y"]),
- ("screenshot","Captura a tela, opcional",{},[])
+ ("screenshot","Captura a tela, opcional",{},[]),
+ ("type_text","Digita na janela ativa, com autorizacao visual",{"text":"string"},["text"]),
+ ("drag_mouse","Arrasta o mouse com autorizacao visual",{"x1":"integer","y1":"integer","x2":"integer","y2":"integer"},["x1","y1","x2","y2"])
 ]
 def tools():
     return [dict(name=n,description=d,inputSchema=dict(type="object",
