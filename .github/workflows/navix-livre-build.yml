@@ -37,6 +37,26 @@ jobs:
         working-directory: navix-livre
         run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name NavixLivre navix_livre.py
 
+      - name: Testar abertura real do painel
+        working-directory: navix-livre
+        shell: pwsh
+        run: |
+          $app = (Resolve-Path ".\\dist\\NavixLivre.exe").Path
+          $processo = Start-Process -FilePath $app -PassThru
+          try {
+            Start-Sleep -Seconds 9
+            $processo.Refresh()
+            if ($processo.HasExited) {
+              throw "Painel terminou inesperadamente com codigo $($processo.ExitCode)"
+            }
+            Write-Host "Painel Windows iniciou e permaneceu ativo."
+          } finally {
+            $processo.Refresh()
+            if (-not $processo.HasExited) {
+              Stop-Process -Id $processo.Id -Force
+            }
+          }
+
       - name: Compilar ponte local MCP
         working-directory: navix-livre
         run: python -m PyInstaller --noconfirm --clean --onefile --console --name NavixBridge navix_remote.py
