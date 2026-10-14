@@ -431,10 +431,14 @@ class NavixWindow:
         output.pack(fill="both",expand=True)
         def refresh():
             try:
-                if os.name!="nt": raise RuntimeError("Disponível no Windows")
-                r=subprocess.run(["tasklist","/fo","table"],capture_output=True,text=True,
-                                 errors="replace",timeout=10,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
-                output.delete("1.0","end");output.insert("end",r.stdout or r.stderr)
+                result=self.agent.list_processes()
+                lines=["PROCESSO".ljust(45)+"PID".ljust(12)+"MEMORIA","="*80]
+                for entry in result["processos"]:
+                    lines.append(entry["nome"][:43].ljust(45)+
+                                 str(entry["pid"]).ljust(12)+entry["memoria"])
+                if result["truncado"]: lines.append("\nExibindo os primeiros 400 processos.")
+                output.delete("1.0","end")
+                output.insert("end","\n".join(lines))
             except Exception as exc:self.error(exc)
         self.button(holder,"Atualizar lista",refresh).pack(anchor="w",pady=9)
         refresh()
