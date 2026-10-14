@@ -22,14 +22,17 @@ on:
         description: "Package/Identity/Name do Partner Center"
         type: string
         required: false
+        default: "WILSONNEVESDEALMEIDA.NavixFree"
       store_publisher:
         description: "Package/Identity/Publisher do Partner Center (CN=...)"
         type: string
         required: false
+        default: "CN=C2E41445-F202-4F8A-9C50-01FF70428979"
       store_publisher_display_name:
         description: "Nome de exibicao do editor cadastrado na Store"
         type: string
         required: false
+        default: "WILSON NEVES DE ALMEIDA"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ inputs.publish || false }}
