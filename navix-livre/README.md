@@ -1,4 +1,4 @@
-# Navix Livre — controle local gratuito para Windows
+# Navix Livre 0.3 — painel Windows gratuito e código aberto
 
 Projeto independente de código aberto (MIT), sem mensalidade e sem vinculo com Desktop Commander.
 
@@ -13,6 +13,15 @@ O GitHub Actions gera o **NavixLivre-Setup-Windows.exe**.
 5. Abra o atalho **Navix Livre** e clique em **Listar Area de Trabalho**.
 
 Inclui painel NavixLivre.exe e ponte MCP local NavixBridge.exe, alem de atalhos e desinstalador. Nao necessita Python no Windows, nao inicia automaticamente com o sistema e nao deve reiniciar o PC. Veja tambem [COMO_INSTALAR.md](COMO_INSTALAR.md).
+
+## Interface 0.3
+
+- Painel escuro com barra lateral: Arquivos, Terminal, Processos, Captura de Tela, Comandos, Configurações e Sobre.
+- Explorador de arquivos, busca, detalhes, cópia para importar/exportar, abrir pasta e leitura de textos.
+- Ações sensíveis (criar, renomear e excluir arquivos) só ficam disponíveis com autorização explícita de escrita; exclusão de pasta somente se vazia.
+- Terminal com saída visível e seleção PowerShell/CMD, habilitado apenas quando autorizado.
+- Consulta de processos, status real da ponte local e captura de tela opcional.
+- Não afirma conexão com ChatGPT quando a ponte só está ativa localmente.
 
 ## Funcoes atuais
 
