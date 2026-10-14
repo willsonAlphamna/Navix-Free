@@ -207,6 +207,7 @@ class NavixWindow:
             self.location=p
             self.path_var.set(str(p))
             self.tree.delete(*self.tree.get_children())
+            self.tree.heading("data",text="Modificado")
             self.records={}
             for item in result["arquivos"]:
                 child=p/item["nome"]
@@ -222,7 +223,8 @@ class NavixWindow:
                                      values=("Pasta" if folder else "Arquivo",size,date))
                 self.records[iid]=child
             self.render_details(None)
-            self.notify(f"{len(self.records)} itens em {p}")
+            suffix=" (mostrando até 500 itens)" if result.get("truncado") else ""
+            self.notify(f"{len(self.records)} itens em {p}"+suffix)
         except Exception as exc: self.error(exc)
 
     def hsize(self,n):
@@ -271,13 +273,20 @@ class NavixWindow:
         if path is None: return self.notify("Selecione um item.")
         if path.is_dir(): return self.show_folder(path)
         try:
-            if self.agent.ui:
-                self.agent.open_path(str(path))
-                self.notify("Arquivo aberto: "+path.name)
+            # Clique manual no proprio PC nao concede acesso visual remoto ao MCP.
+            if os.name=="nt":
+                danger={".exe",".bat",".cmd",".ps1",".msi",".scr",
+                        ".vbs",".js",".jse",".wsf",".reg",".lnk"}
+                if path.suffix.lower() in danger:
+                    if not messagebox.askyesno("Confirmar execução",
+                        "Este arquivo pode executar comandos no seu computador.\n"
+                        "Abrir mesmo assim?",parent=self.root):
+                        return
+                os.startfile(str(self.agent.safe(path)))
+                self.notify("Solicitada abertura de "+path.name)
             else:
                 result=self.agent.read_text(str(path))
                 self.append(result["texto"][:10000])
-                self.notify("Texto lido (abertura visual desativada).")
         except Exception as exc: self.error(exc)
 
     def search(self):
@@ -286,6 +295,7 @@ class NavixWindow:
             if not term: return self.show_folder(self.location)
             r=self.agent.search_files(str(self.location),term,100)
             self.tree.delete(*self.tree.get_children())
+            self.tree.heading("data",text="Pasta")
             self.records={}
             for full in r["resultados"]:
                 p=Path(full)
