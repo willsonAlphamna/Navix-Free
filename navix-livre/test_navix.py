@@ -73,7 +73,9 @@ class TestNavix(unittest.TestCase):
         for method in ('build_files','build_terminal','build_processes','build_capture','build_settings','start_bridge'):
             self.assertTrue(callable(getattr(navix_gui.NavixWindow,method)))
     def test_mcp(self):
-        self.assertEqual(len(tools()),14)
+        self.assertEqual(len(tools()),16)
+        self.assertIn('type_text',{t['name'] for t in tools()})
+        self.assertIn('drag_mouse',{t['name'] for t in tools()})
         v=json.loads(call(self.a,"status",{})["content"][0]["text"])
         self.assertEqual(v["nome"],"Navix Livre")
 if __name__=="__main__":unittest.main()
