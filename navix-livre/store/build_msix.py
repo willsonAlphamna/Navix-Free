@@ -71,7 +71,7 @@ def manifest(name, publisher, display_name, version):
     child(root, "Identity", {"Name": name, "Publisher": publisher,
                             "Version": version, "ProcessorArchitecture": "x64"})
     properties = child(root, "Properties")
-    child(properties, "DisplayName", text="Navix Livre")
+    child(properties, "DisplayName", text="Navix Free")
     child(properties, "PublisherDisplayName", text=display_name)
     child(properties, "Logo", text="Assets\\StoreLogo.png")
     dependencies = child(root, "Dependencies")
@@ -81,7 +81,7 @@ def manifest(name, publisher, display_name, version):
     application = child(child(root, "Applications"), "Application", {
         "Id": "NavixLivre", "Executable": "NavixLivre.exe",
         "EntryPoint": "Windows.FullTrustApplication"})
-    child(application, "VisualElements", {"DisplayName": "Navix Livre",
+    child(application, "VisualElements", {"DisplayName": "Navix Free",
           "Description": "Painel Windows e ponte MCP local, com permissões opcionais.",
           "BackgroundColor": "transparent", "Square150x150Logo": "Assets\\Square150x150Logo.png",
           "Square44x44Logo": "Assets\\Square44x44Logo.png"}, namespace=UAP)
