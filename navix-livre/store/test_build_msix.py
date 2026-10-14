@@ -43,6 +43,10 @@ class StorePackageTests(unittest.TestCase):
         self.assertEqual(identity.attrib["Publisher"], "CN=Fixture & Testing")
         self.assertEqual(root.find(f"{{{msix.FOUNDATION}}}Properties/{{{msix.FOUNDATION}}}PublisherDisplayName").text,
                          "A & B <Publisher>")
+        self.assertEqual(root.find(f"{{{msix.FOUNDATION}}}Properties/{{{msix.FOUNDATION}}}DisplayName").text, "Navix Free")
+        app = root.find(f"{{{msix.FOUNDATION}}}Applications/{{{msix.FOUNDATION}}}Application")
+        visuals = app.find(f"{{{msix.UAP}}}VisualElements")
+        self.assertEqual(visuals.attrib["DisplayName"], "Navix Free")
         capabilities = root.find(f"{{{msix.FOUNDATION}}}Capabilities")
         self.assertEqual([item.attrib["Name"] for item in capabilities], ["runFullTrust"])
         self.assertEqual(info["package_version"], msix.VERSION + ".0")
