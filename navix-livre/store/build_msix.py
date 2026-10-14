@@ -95,15 +95,18 @@ def stage_package(dist, destination, name, publisher, display_name, source_commi
 
     validate_identity(name, publisher, display_name)
     version = msix_version(VERSION)
-    sources = {filename: Path(dist) / filename for filename in EXECUTABLES}
-    sources.update({filename: PROJECT / filename for filename in DOCUMENTS})
-    icon = PROJECT / "assets" / "navix.ico"
+    # Resolve both sides before relative paths: Windows temp roots may use an
+    # 8.3 alias, while __file__.resolve() uses the expanded directory name.
+    project, dist = PROJECT.resolve(), Path(dist).resolve()
+    sources = {filename: dist / filename for filename in EXECUTABLES}
+    sources.update({filename: project / filename for filename in DOCUMENTS})
+    icon = project / "assets" / "navix.ico"
     for path in (*sources.values(), icon):
         if not path.is_file():
             raise ValueError(f"Missing build input: {path}")
     if source_commit is not None and not re.fullmatch(r"[a-fA-F0-9]{40}|[a-fA-F0-9]{64}", source_commit):
         raise ValueError("Source commit must be a complete Git commit hash")
-    destination = Path(destination)
+    destination = Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=False)
     for filename, source in sources.items():
         shutil.copyfile(source, destination / filename)
@@ -115,17 +118,17 @@ def stage_package(dist, destination, name, publisher, display_name, source_commi
     manifest(name, publisher, display_name, version).write(
         destination / "AppxManifest.xml", encoding="utf-8", xml_declaration=True)
     if source_commit is None and shutil.which("git"):
-        result = subprocess.run(["git", "-C", str(PROJECT), "rev-parse", "HEAD"],
+        result = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"],
                                 capture_output=True, text=True, check=False)
         source_commit = result.stdout.strip() if result.returncode == 0 else None
-    source_files = [PROJECT / filename for filename in
+    source_files = [project / filename for filename in
                     ("navix_livre.py", "navix_gui.py", "navix_remote.py", "make_assets.py")]
     source_files += [Path(__file__).resolve(), icon]
     info = {"application_version": VERSION, "package_version": version,
             "identity_name": name, "publisher": publisher,
             "publisher_display_name": display_name, "source_commit": source_commit,
             "signing_status": "unsigned-store-submission", "installable_release": False,
-            "source_sha256": {path.relative_to(PROJECT).as_posix(): sha256(path) for path in source_files},
+            "source_sha256": {path.resolve().relative_to(project).as_posix(): sha256(path) for path in source_files},
             "payload_sha256": {path.relative_to(destination).as_posix(): sha256(path)
                                for path in sorted(destination.rglob("*")) if path.is_file()}}
     (destination / "BUILD_INFO.json").write_text(
@@ -134,7 +137,7 @@ def stage_package(dist, destination, name, publisher, display_name, source_commi
 
 
 def verify_unpacked(staged, unpacked, info):
-    staged, unpacked = Path(staged), Path(unpacked)
+    staged, unpacked = Path(staged).resolve(), Path(unpacked).resolve()
     identity = ET.parse(unpacked / "AppxManifest.xml").getroot().find(f"{{{FOUNDATION}}}Identity")
     expected = {"Name": info["identity_name"], "Publisher": info["publisher"],
                 "Version": info["package_version"], "ProcessorArchitecture": "x64"}

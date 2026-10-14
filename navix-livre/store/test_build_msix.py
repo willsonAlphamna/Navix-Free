@@ -94,6 +94,20 @@ class StorePackageTests(unittest.TestCase):
             self.stage("first")
         msix.verify_unpacked(first, second, info)
 
+    def test_path_aliases_preserve_relative_metadata_and_hashes(self):
+        alias = self.root / "directory-alias"
+        try:
+            alias.symlink_to(self.root, target_is_directory=True)
+        except (OSError, NotImplementedError) as error:
+            self.skipTest(f"Directory symlinks unavailable: {error}")
+        with patch.multiple(msix, PROJECT=alias / "project",
+                            __file__=str(self.project / "store" / "build_msix.py")):
+            info = msix.stage_package(alias / "dist", alias / "aliased-stage", "Fixture.NavixLivre",
+                                      "CN=Fixture & Testing", "A & B <Publisher>", "a" * 40)
+        self.assertEqual(info["source_sha256"]["store/build_msix.py"],
+                         msix.sha256(self.project / "store" / "build_msix.py"))
+        msix.verify_unpacked(self.root / "aliased-stage", alias / "aliased-stage", info)
+
 
 if __name__ == "__main__":
     unittest.main()
