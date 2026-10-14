@@ -40,6 +40,28 @@ class TestNavix(unittest.TestCase):
         self.a.write=True
         self.a.write_text(str(self.r/"a.txt"),"ok")
         self.assertEqual(self.a.read_text(str(self.r/"a.txt"))["texto"],"ok")
+    def test_metadata_and_write_ops(self):
+        original=self.r/"original.txt"
+        original.write_text("ok",encoding="utf-8")
+        info=self.a.get_file_info(str(original))
+        self.assertEqual(info["nome"],"original.txt")
+        self.assertEqual(info["tamanho_bytes"],2)
+        with self.assertRaises(PermissionError):
+            self.a.create_directory(str(self.r/"Pasta"))
+        with self.assertRaises(PermissionError):
+            self.a.move_file(str(original),str(self.r/"renamed.txt"))
+        self.a.write=True
+        folder=self.r/"Pasta"
+        self.a.create_directory(str(folder))
+        target=folder/"renamed.txt"
+        self.a.move_file(str(original),str(target))
+        self.assertFalse(original.exists())
+        self.assertEqual(target.read_text(encoding="utf-8"),"ok")
+        with self.assertRaises(FileExistsError):
+            self.a.create_directory(str(folder))
+        with self.assertRaises(ValueError):
+            self.a.move_file(str(folder),str(folder/"filho"))
+
     def test_privileges(self):
         with self.assertRaises(PermissionError): self.a.run_command("dir")
         with self.assertRaises(PermissionError): self.a.open_url("https://example.org")
@@ -51,7 +73,7 @@ class TestNavix(unittest.TestCase):
         for method in ('build_files','build_terminal','build_processes','build_capture','build_settings','start_bridge'):
             self.assertTrue(callable(getattr(navix_gui.NavixWindow,method)))
     def test_mcp(self):
-        self.assertEqual(len(tools()),10)
+        self.assertEqual(len(tools()),14)
         v=json.loads(call(self.a,"status",{})["content"][0]["text"])
         self.assertEqual(v["nome"],"Navix Livre")
 if __name__=="__main__":unittest.main()
