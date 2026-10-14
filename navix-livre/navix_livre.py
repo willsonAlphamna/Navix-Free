@@ -183,8 +183,15 @@ class Agent:
         class KEYBDINPUT(ctypes.Structure):
             _fields_=[("wVk",wintypes.WORD),("wScan",wintypes.WORD),
                       ("dwFlags",wintypes.DWORD),("time",wintypes.DWORD),("dwExtraInfo",extra)]
+        class MOUSEINPUT(ctypes.Structure):
+            _fields_=[("dx",wintypes.LONG),("dy",wintypes.LONG),("mouseData",wintypes.DWORD),
+                      ("dwFlags",wintypes.DWORD),("time",wintypes.DWORD),("dwExtraInfo",extra)]
+        class HARDWAREINPUT(ctypes.Structure):
+            _fields_=[("uMsg",wintypes.DWORD),("wParamL",wintypes.WORD),("wParamH",wintypes.WORD)]
+        class INPUTUNION(ctypes.Union):
+            _fields_=[("mi",MOUSEINPUT),("ki",KEYBDINPUT),("hi",HARDWAREINPUT)]
         class INPUT(ctypes.Structure):
-            _fields_=[("type",wintypes.DWORD),("ki",KEYBDINPUT)]
+            _fields_=[("type",wintypes.DWORD),("data",INPUTUNION)]
         user32=ctypes.windll.user32
         user32.SendInput.argtypes=[wintypes.UINT,ctypes.POINTER(INPUT),ctypes.c_int]
         user32.SendInput.restype=wintypes.UINT
@@ -192,8 +199,8 @@ class Agent:
             encoded=ch.encode("utf-16-le")
             for i in range(0,len(encoded),2):
                 code=int.from_bytes(encoded[i:i+2],"little")
-                events=(INPUT(1,KEYBDINPUT(0,code,4,0,0)),
-                        INPUT(1,KEYBDINPUT(0,code,6,0,0)))
+                events=(INPUT(1,INPUTUNION(ki=KEYBDINPUT(0,code,4,0,0))),
+                        INPUT(1,INPUTUNION(ki=KEYBDINPUT(0,code,6,0,0))))
                 packet=(INPUT*2)(*events)
                 if user32.SendInput(2,packet,ctypes.sizeof(INPUT))!=2:
                     raise OSError("Falha de SendInput; janela talvez seja privilegiada")
