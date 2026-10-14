@@ -73,8 +73,8 @@ def make_handler(agent,token):
             if not self.authorized(): return
             self.respond(200,{"status":"online","version":VERSION})
         def allowed_tools(self):
-            allowed={"status","list_directory","search_files","read_text"}
-            if agent.write: allowed.add("write_text")
+            allowed={"status","list_directory","search_files","read_text","get_file_info","list_processes"}
+            if agent.write: allowed.update({"write_text","create_directory","move_file"})
             if agent.commands: allowed.add("run_command")
             if agent.ui: allowed.update({"open_url","open_path","click","screenshot"})
             return allowed
