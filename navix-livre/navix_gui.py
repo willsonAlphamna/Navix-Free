@@ -8,7 +8,6 @@ import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, simpledialog
-from navix_livre import VERSION
 
 BG="#0c121a"
 PANEL="#111a25"
@@ -139,6 +138,8 @@ class NavixWindow:
         actions=tk.Frame(self.body,bg=BG)
         actions.pack(fill="x",padx=16,pady=(1,8))
         self.button(actions,"Nova pasta",self.new_folder,enabled=self.agent.write).pack(side="left",padx=(0,6))
+        self.button(actions,"Importar",self.import_file,enabled=self.agent.write).pack(side="left",padx=6)
+        self.button(actions,"Exportar",self.export_file).pack(side="left",padx=6)
         self.button(actions,"Abrir",self.open_selected).pack(side="left",padx=6)
         self.button(actions,"Renomear",self.rename_selected,enabled=self.agent.write).pack(side="left",padx=6)
         self.button(actions,"Excluir",self.delete_selected,enabled=self.agent.write).pack(side="left",padx=6)
@@ -292,6 +293,33 @@ class NavixWindow:
                                      values=("Pasta" if p.is_dir() else "Arquivo","—",str(p.parent)))
                 self.records[iid]=p
             self.notify(f"{len(self.records)} resultados para '{term}'.")
+        except Exception as exc:self.error(exc)
+
+
+    def import_file(self):
+        if not self.agent.write:return
+        source=filedialog.askopenfilename(parent=self.root,title="Importar arquivo para a pasta atual")
+        if not source:return
+        try:
+            import shutil
+            original=Path(source)
+            target=self.agent.safe(self.location/original.name)
+            if target.exists():raise FileExistsError("Já existe um arquivo com esse nome")
+            shutil.copy2(original,target)
+            self.show_folder(self.location)
+        except Exception as exc:self.error(exc)
+
+    def export_file(self):
+        selected=self.selected()
+        if not selected:return self.notify("Selecione um arquivo.")
+        if not selected.is_file():return self.notify("Escolha um arquivo, não uma pasta.")
+        destination=filedialog.asksaveasfilename(parent=self.root,
+                        initialfile=selected.name,title="Exportar cópia de arquivo")
+        if not destination:return
+        try:
+            import shutil
+            shutil.copy2(self.agent.safe(selected),destination)
+            self.notify("Cópia exportada: "+Path(destination).name)
         except Exception as exc:self.error(exc)
 
     def new_folder(self):
