@@ -56,6 +56,8 @@ class TestBridge(unittest.TestCase):
         self.assertNotIn("run_command",names)
         self.assertNotIn("write_text",names)
         self.assertNotIn("click",names)
+        self.assertNotIn("type_text",names)
+        self.assertNotIn("drag_mouse",names)
 
     def test_directory_tool(self):
         request={"jsonrpc":"2.0","id":4,"method":"tools/call",
