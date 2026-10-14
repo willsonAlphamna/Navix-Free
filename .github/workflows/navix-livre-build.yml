@@ -114,13 +114,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "navix-livre-v0.2.0"
+          $tag = "navix-livre-v0.3.0"
           $installer = "dist-install\\NavixLivre-Setup-Windows.exe"
           $checksum = "dist-install\\SHA256.txt"
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $installer $checksum --clobber
           } else {
-            gh release create $tag $installer $checksum --target $env:GITHUB_SHA --title "Navix Livre 0.2.0 - Windows" --notes "Instalador gratuito do Navix Livre para Windows. Inclui painel, ponte MCP local e desinstalador. A conexao remota ao ChatGPT nao e automatica."
+            gh release create $tag $installer $checksum --target $env:GITHUB_SHA --title "Navix Livre 0.3.0 - Windows" --notes "Instalador gratuito do Navix Livre para Windows. Inclui painel escuro com arquivos, terminal e processos, ponte MCP local e desinstalador. A conexao remota ao ChatGPT nao e automatica."
           }
           if ($LASTEXITCODE -ne 0) { throw "Falha em publicar release" }
