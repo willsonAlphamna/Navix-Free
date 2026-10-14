@@ -213,6 +213,6 @@ def main():
     ap.add_argument("--doctor",action="store_true")
     a=ap.parse_args();agent=Agent()
     if a.mcp: mcp(agent)
-    elif a.gui: gui(agent)
+    elif a.gui or (not a.doctor and getattr(sys,"frozen",False)): gui(agent)
     else: print(json.dumps(agent.status(),ensure_ascii=False,indent=2))
 if __name__=="__main__":main()
