@@ -75,6 +75,39 @@ class TestBridge(unittest.TestCase):
         self.assertEqual(self.query(self.token,method="GET",path="/health")[0],200)
         self.assertEqual(self.query(method="GET",path="/health")[0],401)
 
+    def test_get_mcp_returns_405_without_sse(self):
+        code,payload=self.query(self.token,method="GET",path="/mcp")
+        self.assertEqual(code,405)
+        self.assertIn("error",payload)
+
+    def test_invalid_json_rpc_method(self):
+        code,payload=self.query(self.token,body={"jsonrpc":"2.0","id":7,"method":None})
+        self.assertEqual(code,400)
+        self.assertIn("error",payload)
+
+    def test_forbidden_origin_and_host(self):
+        conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=4)
+        payload=json.dumps({"jsonrpc":"2.0","id":1,"method":"tools/list"})
+        conn.request("POST","/mcp",payload,{
+            "Content-Type":"application/json",
+            "Authorization":"Bearer "+self.token,
+            "Origin":"https://example.org"})
+        result=conn.getresponse()
+        self.assertEqual(result.status,403)
+        result.read()
+        conn.close()
+        conn=http.client.HTTPConnection("127.0.0.1",self.server.server_port,timeout=4)
+        conn.putrequest("POST","/mcp",skip_host=True)
+        conn.putheader("Host","outside.example")
+        conn.putheader("Content-Type","application/json")
+        conn.putheader("Authorization","Bearer "+self.token)
+        conn.putheader("Content-Length",str(len(payload.encode("utf-8"))))
+        conn.endheaders(payload.encode("utf-8"))
+        response=conn.getresponse()
+        self.assertEqual(response.status,403)
+        response.read()
+        conn.close()
+
     def test_notification(self):
         req={"jsonrpc":"2.0","method":"notifications/initialized"}
         self.assertEqual(self.query(self.token,body=req)[0],202)
