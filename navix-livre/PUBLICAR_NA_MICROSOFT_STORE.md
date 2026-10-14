@@ -1,4 +1,4 @@
-# Publicar Navix Livre na Microsoft Store
+# Publicar Navix Free na Microsoft Store
 
 ## Situação e objetivo
 
@@ -21,7 +21,7 @@ Não desative SmartScreen, antivírus ou verificação de assinatura para testar
    Não envie documento, senha ou código de acesso ao projeto ou a esta conversa.
    Se publicar em nome de uma empresa, escolha o tipo de conta apropriado.
 2. No Partner Center, abra **Apps and games**, crie um produto MSIX e reserve
-   **Navix Livre**, se disponível. Se precisar escolher outro nome, ajuste
+   **Navix Free**, se disponível. Se precisar escolher outro nome, ajuste
    também o nome apresentado pelo aplicativo e pelo pacote antes de submeter.
 3. Em **Product management > Product identity** / **View app identity details**,
    copie exatamente os três campos abaixo. Preserve maiúsculas e pontuação:
@@ -65,7 +65,7 @@ Não desative SmartScreen, antivírus ou verificação de assinatura para testar
 
 **Descrição:**
 
-Navix Livre é um aplicativo independente, gratuito e de código aberto para
+Navix Free é um aplicativo independente, gratuito e de código aberto para
 trabalhar com arquivos e consultar processos no seu computador Windows.
 Oferece navegação por pastas autorizadas, busca por nome, informações de
 arquivos e leitura de textos. O acesso inicial aos arquivos limita-se à
