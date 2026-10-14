@@ -13,7 +13,7 @@ import tempfile
 import urllib.parse
 import webbrowser
 
-VERSION="0.1.0"
+VERSION="0.3.0"
 def desktop():
     if os.name=="nt":
         try:
@@ -183,7 +183,7 @@ def mcp(agent):
                     "error":{"code":-32603,"message":str(e)}}
         sys.stdout.write(json.dumps(answer,ensure_ascii=False)+"\n");sys.stdout.flush()
 
-def gui(agent):
+def gui_classic(agent):
     import tkinter as tk
     from tkinter import scrolledtext,messagebox
     win=tk.Tk();win.title("Navix Livre | Controle Local");win.geometry("760x500")
@@ -247,6 +247,10 @@ def gui(agent):
     tk.Label(win,text="Conexao externa com ChatGPT exige configuracao adicional.",
              fg="#6c2828").pack(pady=(2,8))
     show(agent.status());win.mainloop()
+
+def gui(agent):
+    from navix_gui import run_gui
+    return run_gui(agent)
 
 def main():
     ap=argparse.ArgumentParser()
