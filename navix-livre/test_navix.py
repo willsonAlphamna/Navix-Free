@@ -17,6 +17,22 @@ class TestNavix(unittest.TestCase):
         (self.r/"Musicas"/"arquivo.txt").write_text("ola",encoding="utf-8")
         self.assertEqual(self.a.list_directory(str(self.r))["arquivos"][0]["nome"],"Musicas")
         self.assertEqual(len(self.a.search_files(str(self.r),"arquivo")["resultados"]),1)
+    def test_read_binary_rejected(self):
+        p=self.r/"picture.dat"
+        p.write_bytes(b"abc\\x00def".replace(b"\\\\x00",b"\\x00"))
+        with self.assertRaises(ValueError): self.a.read_text(str(p))
+
+    def test_large_file_rejected(self):
+        p=self.r/"big.txt"
+        p.write_bytes(b"a"*1_000_001)
+        with self.assertRaises(ValueError): self.a.read_text(str(p))
+
+    def test_listing_truncated_flag(self):
+        for i in range(502): (self.r/("n"+str(i))).touch()
+        result=self.a.list_directory(str(self.r))
+        self.assertTrue(result["truncado"])
+        self.assertEqual(len(result["arquivos"]),500)
+
     def test_escape(self):
         with self.assertRaises(PermissionError): self.a.safe(self.r.parent)
     def test_write(self):
