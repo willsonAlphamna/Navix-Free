@@ -1,8 +1,10 @@
 import json
+import ast
 import tempfile
 from pathlib import Path
 import unittest
-from navix_livre import Agent,call,tools
+from navix_livre import Agent,call,tools,VERSION
+import navix_gui
 
 class TestNavix(unittest.TestCase):
     def setUp(self):
@@ -26,6 +28,12 @@ class TestNavix(unittest.TestCase):
         with self.assertRaises(PermissionError): self.a.run_command("dir")
         with self.assertRaises(PermissionError): self.a.open_url("https://example.org")
         with self.assertRaises(PermissionError): self.a.screenshot()
+    def test_modern_gui_code(self):
+        path=Path(navix_gui.__file__)
+        ast.parse(path.read_text(encoding='utf-8'))
+        self.assertEqual(VERSION,'0.3.0')
+        for method in ('build_files','build_terminal','build_processes','build_capture','build_settings','start_bridge'):
+            self.assertTrue(callable(getattr(navix_gui.NavixWindow,method)))
     def test_mcp(self):
         self.assertEqual(len(tools()),10)
         v=json.loads(call(self.a,"status",{})["content"][0]["text"])
