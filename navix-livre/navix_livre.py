@@ -100,6 +100,45 @@ class Agent:
         p.parent.mkdir(parents=True,exist_ok=True)
         p.write_text(text,encoding="utf-8")
         return dict(salvo=str(p))
+    def get_file_info(self,path):
+        p=self.safe(path)
+        st=p.stat()
+        return dict(caminho=str(p),nome=p.name,pasta=p.is_dir(),
+                    tamanho_bytes=st.st_size,modificado_em=st.st_mtime)
+
+    def create_directory(self,path):
+        if not self.write: raise PermissionError("Ative NAVIX_ALLOW_WRITE=1")
+        p=self.safe(path)
+        p.mkdir(parents=True,exist_ok=False)
+        return dict(criado=str(p))
+
+    def move_file(self,source,destination):
+        if not self.write: raise PermissionError("Ative NAVIX_ALLOW_WRITE=1")
+        a=self.safe(source)
+        b=self.safe(destination)
+        if a==b: raise ValueError("Origem e destino iguais")
+        if a.is_dir() and a in b.parents:
+            raise ValueError("Nao mover uma pasta para dentro dela mesma")
+        if b.exists(): raise FileExistsError("Destino ja existe")
+        if not b.parent.is_dir(): raise FileNotFoundError("Pasta de destino inexistente")
+        a.rename(b)
+        return dict(origem=str(a),destino=str(b))
+
+    def list_processes(self):
+        if os.name!="nt": raise RuntimeError("Disponivel apenas no Windows")
+        import csv
+        import io
+        r=subprocess.run(["tasklist.exe","/fo","csv","/nh"],capture_output=True,
+                         text=True,errors="replace",timeout=12,
+                         creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+        if r.returncode: raise RuntimeError(r.stderr[:500])
+        processes=[]
+        for row in csv.reader(io.StringIO(r.stdout)):
+            if len(row)>=5 and row[1].isdigit():
+                processes.append(dict(nome=row[0],pid=int(row[1]),memoria=row[4]))
+            if len(processes)>=400: break
+        return dict(processos=processes,truncado=len(processes)>=400)
+
     def run_command(self,command,shell="powershell",timeout=15):
         if not self.commands: raise PermissionError("Ative NAVIX_ALLOW_COMMANDS=1")
         if os.name!="nt": raise RuntimeError("Comandos locais para Windows")
@@ -157,6 +196,10 @@ class Agent:
 
 SPECS=[
  ("status","Informacoes do agente",{},[]),
+ ("get_file_info","Consulta metadados de arquivo",{"path":"string"},["path"]),
+ ("list_processes","Lista processos Windows sem alterar",{},[]),
+ ("create_directory","Cria pasta (autorizacao de escrita)",{"path":"string"},["path"]),
+ ("move_file","Move arquivo ou pasta (autorizacao de escrita)",{"source":"string","destination":"string"},["source","destination"]),
  ("list_directory","Lista pasta autorizada",{"path":"string"},[]),
  ("search_files","Busca arquivos pelo nome",{"path":"string","term":"string","limit":"integer"},[]),
  ("read_text","Le arquivo de texto",{"path":"string"},["path"]),
