@@ -1,0 +1,54 @@
+name: Circuito Vivo - Short CTA narrado
+on:
+  push:
+    branches:
+      - circuito-vivo-voz-ptbr-teste-20261023
+    paths:
+      - .github/workflows/cv-voz-cta-final.yml
+permissions:
+  contents: read
+jobs:
+  voz-neural-cta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - name: Instalar gerador de locucao neural
+        run: python -m pip install -q "edge-tts>=7.0,<9"
+      - name: Gerar audio com CTA falado
+        shell: bash
+        run: |
+          mkdir -p outputs
+          cat > speech.py <<'PY'
+          import asyncio,json
+          from pathlib import Path
+          import edge_tts
+          parts=[
+          "Perdeu o manual do seu aparelho?",
+          "No Circuito Vivo, procure pela marca e pelo modelo exato.",
+          "Tem um celular antigo? Comece pelo código certo.",
+          "Impressora Epson? Encontre a ficha do modelo.",
+          "Até seu roteador tem um caminho para o suporte oficial.",
+          "São oitenta e seis fichas e guias organizados.",
+          "Circuito Vivo: pesquise de graça e encontre seu modelo!",
+          "Gostou? Deixe seu like, inscreva-se no canal e ative o sininho!"
+          ]
+          async def main():
+            chunks=[];words=[]
+            tts=edge_tts.Communicate(' '.join(parts),'pt-BR-ThalitaNeural',rate='+10%',pitch='+0Hz')
+            async for seg in tts.stream():
+              if seg['type']=='audio':chunks.append(seg['data'])
+              elif seg['type']=='WordBoundary':words.append({'start':seg['offset']/1e7,'duration':seg['duration']/1e7,'text':seg['text']})
+            Path("outputs/circuito_vivo_v6_voz_thalita_cta.mp3").write_bytes(b''.join(chunks))
+            Path("outputs/circuito_vivo_v6_palavras.json").write_text(json.dumps(words,ensure_ascii=False,indent=2),encoding="utf-8")
+            Path("outputs/circuito_vivo_v6_cenas.json").write_text(json.dumps(parts,ensure_ascii=False,indent=2),encoding="utf-8")
+            print("RESULT",sum(map(len,chunks)),len(words))
+          asyncio.run(main())
+          PY
+          python speech.py
+      - name: Guardar voz e sincronismo
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuito-vivo-v6-voz-cta
+          path: outputs/
+          if-no-files-found: error
+          retention-days: 7
