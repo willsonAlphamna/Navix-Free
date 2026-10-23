@@ -1,0 +1,48 @@
+name: Circuito Vivo - Auditoria real 36 imagens
+on:
+  push:
+    branches: [circuito-vivo-voz-ptbr-teste-20261023]
+    paths: [.github/workflows/cv-photo-browser-audit.yml]
+permissions: {contents: read}
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - run: |
+          pip install -q playwright
+          python -m playwright install chromium
+      - name: Testar fotos e URLs no navegador
+        shell: bash
+        run: |
+          mkdir -p qa
+          cat > chk.py <<'PY'
+          import json
+          from playwright.sync_api import sync_playwright
+          BASE='https://circuito-vivo-biblioteca-v2.vercel.app/'
+          out=[]
+          with sync_playwright() as p:
+            browser=p.chromium.launch(args=['--no-sandbox'])
+            page=browser.new_page()
+            page.goto(BASE,wait_until='networkidle',timeout=30000)
+            data=page.evaluate('ITEMS.filter(x=>x.kind==="fabricante").map(x=>({id:x.id,title:x.title,brand:x.brand}))')
+            for item in data:
+              page.goto(BASE+'?q='+item['title'].split(' — ')[0].split(' / ')[0].replace(' ','%20'),wait_until='networkidle',timeout=30000)
+              card=page.locator('.manualcard').filter(has_text=item['title']).first
+              if not card.count():out.append({**item,'state':'CARD_NOT_FOUND'});continue
+              photo=card.locator('img.device-photo')
+              state=card.locator('.visual-status').first.inner_text()
+              o={'state':state,'photo':bool(photo.count())}
+              if photo.count():
+                o.update(photo.evaluate('(e)=>({url:e.currentSrc,complete:e.complete,naturalWidth:e.naturalWidth,naturalHeight:e.naturalHeight})'))
+              out.append({**item,**o})
+              print('PHOTO',item['id'],item['title'],state,o.get('naturalWidth'))
+            browser.close()
+          open('qa/models.json','w').write(json.dumps(out,ensure_ascii=False,indent=2))
+          PY
+          python chk.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fotos-cv-36-browser
+          path: qa/
+          retention-days: 3
