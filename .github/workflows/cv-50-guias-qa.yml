@@ -1,0 +1,82 @@
+name: Circuito Vivo - QA das 50 ilustracoes
+on:
+  push:
+    branches: [circuito-vivo-voz-ptbr-teste-20261023]
+    paths: [.github/workflows/cv-50-guias-qa.yml]
+permissions: {contents: read}
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - name: Preparar navegador
+        run: |
+          pip install -q playwright
+          python -m playwright install chromium
+      - name: Verificar 5 paginas e celular
+        shell: bash
+        run: |
+          mkdir -p report
+          cat > qa.py <<'PY'
+          import json,traceback
+          from playwright.sync_api import sync_playwright
+          SITE='https://circuito-vivo-biblioteca-v2.vercel.app/'
+          out={'results':[],'failures':[],'screenshots':[]}
+          def check(x):
+            if not x:raise AssertionError('Verificação falsa')
+          try:
+            with sync_playwright() as pw:
+              b=pw.chromium.launch(headless=True,args=['--no-sandbox'])
+              for mode,viewport in [('desktop',{'width':1440,'height':900}),('mobile',{'width':390,'height':844})]:
+                page=b.new_page(viewport=viewport,device_scale_factor=1,is_mobile=(mode=='mobile'),has_touch=(mode=='mobile'),locale='pt-BR')
+                errors=[]
+                page.on('pageerror',lambda ex:errors.append(str(ex)))
+                check(page.goto(SITE,wait_until='domcontentloaded',timeout=30000).status==200)
+                page.wait_for_timeout(900)
+                names=[]
+                for number in range(1,6):
+                  if number>1:
+                    page.locator('#pagination button').filter(has_text='Próxima').click()
+                    page.wait_for_timeout(700)
+                  result=page.locator('#cards article.manualcard').count()
+                  c=page.locator('#cards article.manualcard.guide-card')
+                  photos=c.locator('.guide-picture')
+                  chips=c.locator('.chip.guide')
+                  images=photos.count()
+                  check(images==c.count())
+                  # Force lazy images to decode, then ensure real SVG pixels are available
+                  details=page.evaluate('''async () => { const imgs=[...document.querySelectorAll("#cards .guide-picture")];for(const im of imgs)im.loading="eager";await Promise.all(imgs.map(async im=>{try{await im.decode()}catch(e){}}));return imgs.map(im=>({w:im.naturalWidth,h:im.naturalHeight,alt:im.alt})) }''')
+                  check(len(details)==images and all(x['w']==640 and x['h']==350 for x in details))
+                  check(all(x=='GUIA ILUSTRADO' for x in chips.all_inner_texts()))
+                  check(all('Ilustração temática:' in x['alt'] for x in details))
+                  names+=c.locator('h3').all_inner_texts()
+                  check(result>0)
+                  if number in [3,4,5]:
+                    page.screenshot(path=f'report/{mode}-pagina-{number}.png',full_page=True,timeout=30000)
+                  out['results'].append(dict(mode=mode,page=number,cards=result,illustrated=images,validImages=len(details)))
+                  print('OK',mode,'pagina',number,'cards',result,'guias ilustrados',images)
+                check(len(names)==50 and len(set(names))==50)
+                check(not errors)
+                if mode=='mobile':
+                  check(page.evaluate('document.documentElement.scrollWidth<=window.innerWidth+3'))
+                # test direct search
+                page.goto(SITE+'?q=Impressora%20Canon%20n%C3%A3o%20aparece',wait_until='domcontentloaded')
+                page.wait_for_timeout(300)
+                check(page.locator('#cards .guide-picture').count()==1)
+                out['results'].append(dict(mode=mode,search='Impressora Canon',ok=True))
+                page.close()
+              b.close()
+          except Exception as ex:
+            out['failures'].append(str(ex)+'\n'+traceback.format_exc())
+          with open('report/qa.json','w') as f:json.dump(out,f,ensure_ascii=False,indent=2)
+          print('FINAL',json.dumps({'results':len(out['results']),'failures':out['failures']},ensure_ascii=False))
+          assert not out['failures'],out['failures']
+          PY
+          python qa.py
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: circuito-vivo-50-guias-qa
+          path: report/
+          retention-days: 7
