@@ -1,0 +1,60 @@
+name: Circuito Vivo - Validar 13 fotos
+on:
+  push:
+    branches: [circuito-vivo-voz-ptbr-teste-20261023]
+    paths: [.github/workflows/cv-photo-audit.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - run: pip install -q requests beautifulsoup4 pillow
+      - name: Checar 13 URLs e imagens oficiais
+        shell: bash
+        run: |
+          cat > validate.py <<'PY'
+          import requests, json, io, os
+          from bs4 import BeautifulSoup
+          from PIL import Image
+          sources={"1":"https://alasil.ae/cdn/shop/files/MBA-13-M1-Silver-1.webp?v=1766388856","2":"https://cdn.shoplightspeed.com/shops/638151/files/72560487/image.jpg","3":"https://media.jacob.services/images/5a/0d/e4/c6/5a0de4c6c510c15eb5e321c5094a8246.jpg","4":"https://biznesso.vip/assets/front/img/user/items/slider-images/ceda71ca98c50915243c887dd85f0f516bd56c03.png","5":"https://media.rueducommerce.fr/r500/rd/products/be2/be254b2cff27170e5e054f5dc2c432c41ede8f8a.jpg","6":"https://www.gosupps.com/media/catalog/product/7/1/71xSYnvg7OL_1.jpg","22":"https://www.cell2get.com/cdn/shop/files/note_204_20white_8ab63a47-2be3-48b6-a399-ca3df086a24e.jpg?v=1737990277","23":"https://cienciamodernaonline.vteximg.com.br/arquivos/ids/159561-500-500/Gran-DUos-Prime-Tv---Cinza-8.jpg?v=635817226028230000","24":"https://i.ebayimg.com/images/g/Y2AAAOSw39VoM4DY/s-l1200.jpg","25":"https://sota.store/image/cache/catalog/Samsung/samsung-galaxy-j5-j7-black-01-1600x1600.webp","34":"https://static-data2.manualslib.com/product-images/50a/1121837/tp-link-tl-wr941nd-wireless-router.jpg","35":"https://static-data2.manualslib.com/product-images/890/1129574/tp-link-tl-wr842n-wireless-router.jpg","36":"https://static-data2.manualslib.com/product-images/50a/1121837/tp-link-tl-wr941nd-wireless-router.jpg"}
+          official={"1":"https://www.apple.com/br/macbook-air/","2":"https://www.apple.com/br/airpods-pro/","3":"https://www.apple.com/br/apple-tv-4k/","4":"https://www.apple.com/br/iphone/","5":"https://www.apple.com/br/ipad/","6":"https://www.apple.com/br/apple-watch/"}
+          r={'candidates':{},'official':{}}
+          def check(u):
+           try:
+            rr=requests.get(u,timeout=18,headers={'User-Agent':'Mozilla/5.0','Referer':'https://www.google.com/'})
+            z={'code':rr.status_code,'type':rr.headers.get('content-type'),'bytes':len(rr.content)}
+            try:
+             im=Image.open(io.BytesIO(rr.content))
+             z.update(width=im.width,height=im.height,valid=im.width>=250 and im.height>=200)
+            except Exception:z['valid']=False
+            return z
+           except Exception as e:return {'error':str(e)[:180],'valid':False}
+          for k,v in sources.items():
+           z=check(v);r['candidates'][k]=dict(url=v,**z)
+           print('IMAGE',k,str(z)[:150])
+          for k,u in official.items():
+           try:
+            page=requests.get(u,timeout=18,headers={'User-Agent':'Mozilla/5.0'})
+            soup=BeautifulSoup(page.text,'html.parser')
+            photos=[t.get('content') for t in soup.find_all('meta') if (t.get('property') or '').lower() in ['og:image','twitter:image']]
+            photos=list(dict.fromkeys(photos))
+            z=[]
+            for img in photos[:3]:
+             if img.startswith('//'):img='https:'+img
+             if img.startswith('/'):img='https://www.apple.com'+img
+             z.append(dict(url=img,**check(img)))
+            r['official'][k]=z
+            print('APPLE',k,str(z)[:260])
+           except Exception as e:r['official'][k]={'error':str(e)}
+          os.makedirs('qa',exist_ok=True)
+          open('qa/images.json','w').write(json.dumps(r,indent=2))
+          
+          PY
+          python validate.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: imagens-verificadas-cv
+          path: qa/
+          retention-days: 3
