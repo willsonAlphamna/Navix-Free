@@ -1,0 +1,94 @@
+name: Circuito Vivo - Auditoria Funcional Site
+on:
+  push:
+    branches: [circuito-vivo-voz-ptbr-teste-20261023]
+    paths: [.github/workflows/cv-auditoria-site.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Install browser test tools
+        run: |
+          python -m pip install -q requests playwright
+          python -m playwright install chromium
+      - name: Audit desktop mobile models and links
+        shell: bash
+        run: |
+          cat > test.py <<'PY'
+          import requests,json,traceback,time,os
+          from pathlib import Path
+          from concurrent.futures import ThreadPoolExecutor,as_completed
+          from playwright.sync_api import sync_playwright
+          BASE='https://circuito-vivo-biblioteca-v2.vercel.app/'
+          R={'tests':[],'links':[],'errors':[]}
+          os.makedirs('qa',exist_ok=True)
+          def ck(name,fn):
+            try:
+              v=fn();assert v is not False; R['tests'].append({'test':name,'ok':True,'info':str(v)[:160]})
+            except Exception as e:R['tests'].append({'test':name,'ok':False,'error':str(e)[:260]})
+          def search(page,q,count):
+            page.goto(BASE+'?q='+requests.utils.quote(q),wait_until='domcontentloaded',timeout=25000)
+            page.wait_for_timeout(100)
+            v=page.locator('#cards article').count()
+            assert v==count,f'{q} {v}!={count}'
+            return v
+          def ping(url):
+            try:
+              r=requests.get(url,timeout=20,headers={'User-Agent':'Mozilla/5.0'},allow_redirects=True)
+              return {'url':url,'status':r.status_code,'ok':r.status_code==200}
+            except Exception as e:return {'url':url,'status':None,'ok':False,'error':str(e)[:140]}
+          try:
+            with sync_playwright() as pw:
+              b=pw.chromium.launch(headless=True,args=['--no-sandbox'])
+              page=b.new_page(viewport={'width':1440,'height':900},locale='pt-BR')
+              jsErrors=[];page.on('pageerror',lambda e:jsErrors.append(str(e)))
+              ck('desktop home 200',lambda:page.goto(BASE,wait_until='domcontentloaded',timeout=25000).status==200)
+              ck('86 registros',lambda:page.evaluate('ITEMS.length')==86)
+              ck('36 fichas fabricantes',lambda:page.evaluate("ITEMS.filter(x=>x.kind==='fabricante').length")==36)
+              ck('50 guias',lambda:page.evaluate("ITEMS.filter(x=>x.kind==='guia').length")==50)
+              ck('Epson L3250',lambda:search(page,'Epson L3250',2))
+              ck('Galaxy J5 Pro',lambda:search(page,'Galaxy J5 Pro',1))
+              ck('TP Link TL-WR740N',lambda:search(page,'TL-WR740N',1))
+              ck('incompatibilidade de marcas',lambda:search(page,'Samsung Epson B999',0)==0)
+              ck('sem resultado exibe aviso',lambda:search(page,'ZZZ99888',0)==0 and page.locator('#empty').is_visible())
+              page.goto(BASE,wait_until='domcontentloaded')
+              ck('filtro Samsung',lambda:page.locator('#brandFilters button').filter(has_text='Samsung').first.count()==1)
+              page.locator('#brandFilters button').filter(has_text='Samsung').first.click()
+              ck('filtro Samsung devolve fichas',lambda:page.locator('#cards article').count()>0 and 'Samsung' in page.locator('#resultsSummary').inner_text())
+              page.goto(BASE,wait_until='domcontentloaded')
+              page.locator('[data-type="guia"]').click()
+              ck('filtro guias pagina',lambda:page.locator('#cards article').count()==18)
+              page.goto(BASE,wait_until='domcontentloaded')
+              first=page.locator('#cards article h3').first.inner_text()
+              page.locator('#pagination button').filter(has_text='Próxima').click()
+              ck('paginação',lambda:page.locator('#cards article h3').first.inner_text()!=first)
+              ck('link Youtube certo',lambda:page.locator('a[href*="youtube.com/@circuitovivobr"]').count()>0)
+              ck('sem erros JS',lambda:len(jsErrors)==0)
+              page.goto(BASE,wait_until='domcontentloaded');page.screenshot(path='qa/desktop.png',full_page=True)
+              mob=b.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
+              ck('mobile home 200',lambda:mob.goto(BASE,wait_until='domcontentloaded').status==200)
+              ck('mobile busca',lambda:mob.locator('#search').is_visible())
+              ck('mobile sem scroll horizontal',lambda:mob.evaluate('document.documentElement.scrollWidth<=innerWidth+3'))
+              ck('mobile busca Galaxy J5 Pro',lambda:search(mob,'Galaxy J5 Pro',1))
+              mob.goto(BASE,wait_until='domcontentloaded');mob.screenshot(path='qa/mobile.png',full_page=True)
+              urls=page.evaluate('ITEMS.map(x=>x.url)')
+              with ThreadPoolExecutor(max_workers=12) as ex:
+                futs=[ex.submit(ping,u) for u in sorted(set(urls))]
+                for f in as_completed(futs):R['links'].append(f.result())
+              ck('86 URLs internas HTTP 200',lambda:len(R['links'])==86 and all(x['ok'] for x in R['links']))
+              b.close()
+          except Exception:R['errors'].append(traceback.format_exc())
+          Path('qa/result.json').write_text(json.dumps(R,ensure_ascii=False,indent=2))
+          print('AUDIT SUMMARY',json.dumps({'pass':sum(x['ok'] for x in R['tests']),'fail':[x for x in R['tests'] if not x['ok']],'links':len(R['links']),'oklinks':sum(x['ok'] for x in R['links']),'errors':R['errors']}))
+          PY
+          python test.py
+      - name: Upload complete report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cv-site-auditoria-86-links
+          path: qa/
+          retention-days: 7
