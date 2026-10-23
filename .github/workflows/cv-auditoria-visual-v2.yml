@@ -1,0 +1,78 @@
+name: Circuito Vivo V2 - Testes de Layout e Busca
+on:
+  push:
+    branches: [circuito-vivo-voz-ptbr-teste-20261023]
+    paths: [.github/workflows/cv-auditoria-visual-v2.yml]
+permissions: {contents: read}
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - run: |
+          pip install -q playwright requests
+          python -m playwright install chromium
+      - name: Conferir desktop iPhone fotos e menus
+        shell: bash
+        run: |
+          mkdir -p qa
+          cat > audit.py <<'PY'
+          import json,requests,traceback
+          from playwright.sync_api import sync_playwright
+          URL='https://circuito-vivo-biblioteca-v2.vercel.app/'
+          failures=[];success=[]
+          def test(name,act):
+           try:
+            r=act()
+            if r is False:raise AssertionError('resultado falso')
+            success.append(name)
+           except Exception as ex:failures.append({'name':name,'error':str(ex)})
+          def qpage(p,q):
+           p.goto(URL+'?q='+requests.utils.quote(q),wait_until='networkidle',timeout=35000)
+           p.wait_for_timeout(650)
+           return p.locator('#cards article.manualcard').count()
+          with sync_playwright() as pw:
+           b=pw.chromium.launch(args=['--no-sandbox'])
+           d=b.new_page(viewport={'width':1440,'height':900},locale='pt-BR')
+           errs=[]
+           d.on('pageerror',lambda e:errs.append(str(e)))
+           test('home 200',lambda:d.goto(URL,wait_until='networkidle').status==200)
+           test('menu 14 marcas com logos',lambda:d.locator('#brandFilters .brand-badge').count()>=14)
+           test('foto real L3250',lambda:qpage(d,'Epson L3250')==2 and d.locator('article.has-photo, .visual.has-device-photo').count()>=1)
+           test('Epson L3250 ficha',lambda:d.locator('article.manualcard').first.locator('h3').inner_text().startswith('EcoTank L3250'))
+           test('Samsung J5 Pro',lambda:qpage(d,'Galaxy J5 Pro')==1)
+           test('TP-Link TL-WR740N',lambda:qpage(d,'TL-WR740N')==1)
+           test('modelo inexistente',lambda:qpage(d,'HP XZZ1239')==0 and d.locator('#empty').is_visible())
+           d.goto(URL,wait_until='networkidle')
+           d.locator('#brandFilters button').filter(has_text='Epson').first.click()
+           test('menu Epson filtra',lambda:d.locator('article.manualcard').count()>0 and 'Epson' in d.locator('#resultsSummary').inner_text())
+           d.goto(URL,wait_until='networkidle')
+           d.locator('[data-type="guia"]').click()
+           test('filtro guias',lambda:d.locator('article.manualcard').count()==18 and d.locator('.chip.guide').count()==18)
+           d.goto(URL,wait_until='networkidle')
+           first=d.locator('article.manualcard h3').first.inner_text()
+           d.locator('#pagination button').filter(has_text='Próxima').click()
+           test('paginação',lambda:d.locator('article.manualcard h3').first.inner_text()!=first)
+           test('erros javascript',lambda:len(errs)==0)
+           d.goto(URL,wait_until='networkidle')
+           d.screenshot(path='qa/desktop.png',full_page=True)
+           m=b.new_page(viewport={'width':390,'height':844},device_scale_factor=2,is_mobile=True,has_touch=True)
+           test('mobile abre',lambda:m.goto(URL,wait_until='networkidle').status==200)
+           test('mobile sem scroll horizontal',lambda:m.evaluate('document.documentElement.scrollWidth <= innerWidth + 3'))
+           test('mobile pesquisa',lambda:qpage(m,'Galaxy J5 Pro')==1)
+           m.goto(URL,wait_until='networkidle')
+           m.screenshot(path='qa/mobile.png',full_page=True)
+           b.close()
+          report={'passed':success,'failed':failures}
+          open('qa/result.json','w').write(json.dumps(report,ensure_ascii=False,indent=2))
+          print('TESTES',json.dumps(report,ensure_ascii=False))
+          assert not failures,'Falha(s) na auditoria: '+str(failures)
+          PY
+          python audit.py
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cv-visual-v2-qa
+          path: qa/
+          if-no-files-found: error
+          retention-days: 7
