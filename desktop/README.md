@@ -1,7 +1,7 @@
 # Navix Desktop 0.1.0 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
-servidor MCP local com credencial por execução, navegador integrado, suporte experimental
+servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
 a Opera e automação de desktop autorizada por sessão.
 
 ## Uso do instalador
@@ -20,7 +20,7 @@ Não inicia com o Windows e não abre portas no roteador.
 
 ## Limites reais
 
-- O servidor escuta apenas `127.0.0.1:8765`. Outra máquina não pode conectar diretamente.
+- O servidor escuta apenas `127.0.0.1`, numa porta livre selecionada automaticamente. Outra máquina não pode conectar diretamente.
 - O programa **não conecta esta conversa do ChatGPT automaticamente**. A integração
   externa requer transporte seguro e autenticação compatíveis com o cliente escolhido.
   OAuth e serviço de pareamento remoto para terceiros ainda não estão implementados.

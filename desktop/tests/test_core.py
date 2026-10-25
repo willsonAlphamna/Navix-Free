@@ -59,3 +59,7 @@ def test_https_url():
 
 def test_unknown_permission(tmp_path):
     with pytest.raises(ValueError): Session(tmp_path).activate(['shell'])
+
+
+def test_non_ascii_token_denied(tmp_path):
+    assert not Session(tmp_path).authenticates('inválido')

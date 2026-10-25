@@ -35,3 +35,22 @@ def test_actual_mcp_client_initialize_and_call(tmp_path):
         asyncio.run(check())
     finally:
         service.close()
+
+
+def test_automatic_port_and_release(tmp_path):
+    session = Session(tmp_path)
+    service = Service(session, None, Desktop(session), port=0)
+    assert service.port > 0
+    service.start()
+    try:
+        for _ in range(100):
+            if service.ready: break
+            time.sleep(.02)
+        assert service.ready
+        with httpx.Client(trust_env=False) as client:
+            response = client.get('http://127.0.0.1:%d/health' % service.port,
+                                  headers={'Authorization': 'Bearer ' + session.token})
+        assert response.json()['service'] == 'navix-desktop'
+    finally:
+        service.close()
+    assert not service.ready

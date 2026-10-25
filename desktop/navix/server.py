@@ -1,5 +1,6 @@
 import functools
 import threading
+import socket
 from mcp.server.fastmcp import FastMCP, Image
 from starlette.middleware import Middleware
 from starlette.responses import JSONResponse
@@ -120,6 +121,12 @@ def make_app(session, browser, desktop, port=8765):
 
 class Service:
     def __init__(self, session, browser, desktop, port=8765):
+        self.socket = None
+        if port == 0:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.bind(('127.0.0.1', 0))
+            port = self.socket.getsockname()[1]
+        self.port = port
         self.app = make_app(session, browser, desktop, port)
         self.server = uvicorn.Server(uvicorn.Config(self.app, host='127.0.0.1', port=port,
                                     log_config=None, access_log=False))
@@ -127,7 +134,7 @@ class Service:
 
     def start(self):
         if not self.thread:
-            self.thread = threading.Thread(target=self.server.run, daemon=True, name='navix-mcp')
+            self.thread = threading.Thread(target=lambda: self.server.run(sockets=[self.socket] if self.socket else None), daemon=True, name='navix-mcp')
             self.thread.start()
 
     @property
@@ -138,3 +145,5 @@ class Service:
         self.server.should_exit = True
         if self.thread:
             self.thread.join(timeout=5)
+        if self.socket:
+            self.socket.close()

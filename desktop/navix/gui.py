@@ -19,7 +19,7 @@ class Panel:
         directory = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NavixDesktop'
         self.session = Session(directory)
         self.browser = Browser(self.session)
-        self.service = Service(self.session, self.browser, Desktop(self.session))
+        self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
         self.events = queue.Queue()
         self.busy = False
         self.tray = None
@@ -136,13 +136,14 @@ class Panel:
         if not self.session.status()['active'] or not self.service.ready:
             messagebox.showinfo('Navix', 'Conecte e aguarde o servidor ficar pronto.')
             return
-        data = {'url': 'http://127.0.0.1:8765/mcp',
+        data = {'url': 'http://127.0.0.1:%d/mcp' % self.service.port,
                 'headers': {'Authorization': 'Bearer ' + self.session.token}}
         self.root.clipboard_clear()
         self.root.clipboard_append(json.dumps(data, indent=2))
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
 
     def diagnose(self):
+        self.show('Porta local: ' + str(self.service.port))
         self.show('Servidor MCP: ' + ('pronto' if self.service.ready else 'parado ou iniciando'))
         self.show('Sessão: ' + json.dumps(self.session.status(), ensure_ascii=False))
         for package in ('mcp', 'playwright', 'PyAutoGUI', 'Pillow'):
@@ -158,8 +159,8 @@ class Panel:
             self.show('Servidor em execução; credencial renovada. Clique em Conectar para nova sessão.')
             return
         self.service.close()
-        self.service = Service(self.session, self.browser, Desktop(self.session))
-        self.show('Serviço recriado. Clique em Conectar. Se a porta 8765 estiver ocupada, feche o MCP antigo.')
+        self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
+        self.show('Serviço recriado. Clique em Conectar. Uma nova porta local livre foi selecionada.')
 
     def tick(self):
         while not self.events.empty():
@@ -177,7 +178,7 @@ class Panel:
         if status['active'] and self.service.ready:
             self.state.set('LOCAL PRONTO — sessão autorizada: %ds' % status['remaining_seconds'])
         elif status['active']:
-            self.state.set('SERVIDOR INDISPONÍVEL — verifique porta 8765 / Diagnosticar')
+            self.state.set('SERVIDOR INDISPONÍVEL — clique em Diagnosticar')
         else:
             self.state.set('DESCONECTADO — acesso desativado')
         self.root.after(500, self.tick)

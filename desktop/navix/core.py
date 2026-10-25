@@ -35,7 +35,7 @@ class Session:
 
     def authenticates(self, token):
         with self.lock:
-            return bool(token) and secrets.compare_digest(token, self.token)
+            return isinstance(token, str) and bool(token) and token.isascii() and secrets.compare_digest(token, self.token)
 
     def require(self, permission):
         with self.lock:
