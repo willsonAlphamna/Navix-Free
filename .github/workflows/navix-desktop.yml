@@ -45,6 +45,13 @@ jobs:
           Start-Sleep -Seconds 10
           if ($app.HasExited) { throw 'O aplicativo encerrou durante abertura' }
           Stop-Process -Id $app.Id
+      - name: Teste completo do aplicativo empacotado
+        shell: pwsh
+        run: |
+          $report = "$PWD\packaged-selftest.json"
+          $check = Start-Process dist\NavixDesktop\NavixDesktop.exe -ArgumentList '--self-test', $report -Wait -PassThru
+          Get-Content $report
+          if ($check.ExitCode -ne 0) { throw 'Teste completo do aplicativo falhou' }
       - name: Gerar instalador
         shell: pwsh
         run: |
@@ -52,6 +59,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-FileHash output\*.exe -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 output\SHA256.txt
           Copy-Item DEPENDENCIES.txt output\
+          Copy-Item packaged-selftest.json output\
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
@@ -71,3 +79,8 @@ jobs:
           name: NavixDesktop-Windows-Piloto
           path: desktop/output/
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: NavixDesktop-Diagnostico
+          path: desktop/packaged-selftest.json
