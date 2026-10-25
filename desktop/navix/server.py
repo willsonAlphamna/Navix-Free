@@ -3,7 +3,7 @@ import threading
 import socket
 from mcp.server.fastmcp import FastMCP, Image
 from starlette.middleware import Middleware
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 import uvicorn
 from .workspace import Workspace
@@ -17,6 +17,14 @@ class TokenAuth:
     async def __call__(self, scope, receive, send):
         if scope['type'] != 'http':
             return await self.app(scope, receive, send)
+        # Navix usa Bearer local, sem servidor OAuth. Metadados OAuth não existem;
+        # retornar 404 permite que clientes MCP reconheçam isso sem expor ferramentas.
+        path = scope.get('path', '')
+        if scope.get('method') == 'GET' and (
+            path.startswith('/.well-known/oauth-protected-resource') or
+            path.startswith('/.well-known/oauth-authorization-server')
+        ):
+            return await Response(status_code=404)(scope, receive, send)
         headers = dict(scope.get('headers', []))
         value = headers.get(b'authorization', b'').decode('latin1')
         token = value[7:] if value.startswith('Bearer ') else ''

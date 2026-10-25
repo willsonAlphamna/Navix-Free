@@ -112,3 +112,15 @@ def test_origin_attack_denied(api):
     request_headers['Origin'] = 'https://evil.example'
     response = client.post('/mcp', headers=request_headers, json={})
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize('path', [
+    '/.well-known/oauth-protected-resource/mcp',
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/oauth-authorization-server',
+])
+def test_no_oauth_metadata_is_404_without_token(api, path):
+    _, client = api
+    assert client.get(path).status_code == 404
+    # A exceção de descoberta não libera outros caminhos sem autorização.
+    assert client.get('/health').status_code == 401
