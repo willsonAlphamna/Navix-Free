@@ -21,6 +21,28 @@ TUNNEL_ID = re.compile(r'^tunnel_[a-fA-F0-9]{32}$')
 _BACKOFF = (3, 8, 20, 45, 90)
 
 
+def _diagnose_runtime_line(line):
+    """Only return controlled categories, never an untrusted log line or secret."""
+    value = line.lower()
+    if any(code in value for code in ('401 unauthorized', 'status 401', 'http 401', '401:')):
+        return 'Credencial do túnel recusada (401). Use uma chave Runtime com Tunnels Read + Use.'
+    if any(code in value for code in ('403 forbidden', 'status 403', 'http 403', '403:')):
+        return 'A conta não tem acesso ao túnel (403). Confira Tunnels Read + Use.'
+    if '429' in value and any(term in value for term in ('http', 'rate', 'status')):
+        return 'Serviço temporariamente limitado (429). Aguarde e tente novamente.'
+    if 'address already in use' in value or 'only one usage of each socket' in value:
+        return 'Porta de diagnóstico ocupada por outro programa.'
+    if ('cloudflared' in value and
+            any(term in value for term in ('not found', 'no such file', 'cannot find', 'missing'))):
+        return 'Componente cloudflared não encontrado na instalação.'
+    if ('tunnel' in value and 'not found' in value) or 'unknown tunnel id' in value:
+        return 'ID de túnel não encontrado. Verifique o vínculo na sua organização.'
+    if any(term in value for term in ('connection refused', 'network is unreachable',
+                                      'no such host', 'connection reset', 'i/o timeout')):
+        return 'Falha de rede ou acesso ao serviço. Confira conexão, VPN e firewall.'
+    return ''
+
+
 def bundled_tunnel_client():
     """Find the signed-upstream binary included in the Windows installer."""
     locations = [Path(sys.executable).resolve().parent / 'tunnel-client.exe']
@@ -127,6 +149,22 @@ class TunnelManager:
         self.started_at = 0
         self.connected_url = ''
         self.error = ''
+        self.last_reason = ''
+
+    def _read_runtime_output(self, process):
+        """Classify stderr/stdout in memory; never persist raw text or tokens."""
+        stream = getattr(process, 'stdout', None)
+        if stream is None:
+            return
+        try:
+            for line in stream:
+                reason = _diagnose_runtime_line(line[:2000])
+                if reason:
+                    with self.lock:
+                        if self.process is process:
+                            self.last_reason = reason
+        except (OSError, UnicodeError):
+            pass
 
     def _event(self, event, result='ok'):
         # Controlled event codes only. Never log process environment or key.
@@ -149,7 +187,14 @@ class TunnelManager:
             'MCP_SERVER_URL': url,
             'MCP_EXTRA_HEADERS': 'Authorization: Bearer ' + self.session.token,
             'MCP_DISCOVERY_EXTRA_HEADERS': 'Authorization: Bearer ' + self.session.token,
+            # Another installed tunnel may already own 127.0.0.1:8080.
+            'HEALTH_LISTEN_ADDR': '127.0.0.1:0',
         })
+        # The GUI is authoritative. Ignore shell profiles inherited from a
+        # previous manual pilot that could override the target or tunnel.
+        for setting in ('TUNNEL_CLIENT_CONFIG', 'TUNNEL_CLIENT_PROFILE',
+                        'TUNNEL_CLIENT_PROFILE_FILE'):
+            env.pop(setting, None)
         return env, url
 
     def configure(self, tunnel_id, api_key):
@@ -190,12 +235,16 @@ class TunnelManager:
                     return 'Sessão encerrada durante o diagnóstico.'
                 self.process = self.popen([self.executable, 'run'], env=env,
                                           stdin=subprocess.DEVNULL,
-                                          stdout=subprocess.DEVNULL,
-                                          stderr=subprocess.DEVNULL,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.STDOUT,
+                                          text=True, encoding='utf-8', errors='replace',
                                           creationflags=flags)
                 self.connected_url = url
                 self.started_at = self.clock()
                 self.error = ''
+                self.last_reason = ''
+                threading.Thread(target=self._read_runtime_output,
+                                 args=(self.process,), daemon=True).start()
             self._event('started')
             return 'Túnel iniciado. Confirme o plugin uma vez no ChatGPT.'
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
@@ -232,6 +281,9 @@ class TunnelManager:
                     self._event('endpoint_changed', 'warning')
                 else:
                     self.process = None
+                    self.error = (f'O cliente de túnel encerrou (código {return_code}). '
+                                  + (self.last_reason or
+                                     'Causa não identificada; verifique também o firewall ou a chave Runtime.'))
                     self.attempts += 1
                     self.retry_at = self.clock() + _BACKOFF[min(self.attempts - 1, len(_BACKOFF) - 1)]
                     self._event('process_exited', 'error')

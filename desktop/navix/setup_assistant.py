@@ -129,7 +129,7 @@ def open_assistant(panel):
     id_entry = tk.Entry(remote, textvariable=tunnel_id, font=('Consolas', 10),
                         bg='#243550', fg='white', insertbackground='white', relief='flat')
     id_entry.pack(fill='x', ipady=8)
-    panel._text(remote, 'Chave da sua conta OpenAI (não aparece na tela)',
+    panel._text(remote, 'Chave Runtime OpenAI (Tunnels Read + Use; oculta)',
                 10, 'bold').pack(anchor='w', pady=(12, 4))
     key_entry = tk.Entry(remote, textvariable=secret, show='*', font=('Consolas', 10),
                          bg='#243550', fg='white', insertbackground='white', relief='flat')

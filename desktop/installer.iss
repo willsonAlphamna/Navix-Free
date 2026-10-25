@@ -1,4 +1,4 @@
-#define AppVersion "0.2.6"
+#define AppVersion "0.2.7"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
 AppName=NavixX Desktop

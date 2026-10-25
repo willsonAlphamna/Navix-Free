@@ -64,10 +64,18 @@ jobs:
           Expand-Archive $archive -DestinationPath tunnel-client-extracted
           $binary = Get-ChildItem tunnel-client-extracted -Filter tunnel-client.exe -Recurse | Select-Object -First 1
           if (!$binary) { throw 'Binário tunnel-client.exe ausente' }
+          $companion = Get-ChildItem tunnel-client-extracted -Filter cloudflared.exe -Recurse | Select-Object -First 1
+          if (!$companion) { throw 'Companion oficial cloudflared.exe ausente do release' }
+          $manifest = Get-ChildItem tunnel-client-extracted -Filter cloudflared-manifest.json -Recurse | Select-Object -First 1
+          if (!$manifest) { throw 'Manifesto do cloudflared ausente do release' }
           Copy-Item $binary.FullName dist\NavixDesktop\tunnel-client.exe
+          Copy-Item $companion.FullName dist\NavixDesktop\cloudflared.exe
+          Copy-Item $manifest.FullName dist\NavixDesktop\cloudflared-manifest.json
           Invoke-WebRequest 'https://raw.githubusercontent.com/openai/tunnel-client/v0.0.18/LICENSE' -OutFile dist\NavixDesktop\tunnel-client-LICENSE.txt
           & dist\NavixDesktop\tunnel-client.exe help quickstart | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Cliente de túnel não executou no Windows' }
+          & dist\NavixDesktop\tunnel-client.exe cloudflared version | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Companion cloudflared não foi reconhecido' }
       - name: Verificar abertura do executável
         shell: pwsh
         run: |
@@ -93,11 +101,13 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.6.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.7.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client.exe")) { throw 'Cliente de túnel não foi incorporado ao instalador' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared.exe")) { throw 'Companion cloudflared não foi incorporado ao instalador' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared-manifest.json")) { throw 'Manifesto cloudflared não foi incorporado' }
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client-LICENSE.txt")) { throw 'Licença do cliente de túnel ausente' }
           $app = Start-Process $exe -PassThru
           Start-Sleep -Seconds 8
@@ -132,7 +142,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.6.exe
+          test -s release/NavixDesktop-Setup-0.2.7.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -141,8 +151,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.6 release/* \
+          gh release create navix-desktop-v0.2.7 release/* \
             --target "$GITHUB_SHA" \
-            --title "NAVIX Desktop 0.2.6 — Assistente de conexão" \
-            --notes "NavixX Desktop 0.2.6: assistente gráfico para configurar e iniciar o Secure MCP Tunnel sem PowerShell, cliente oficial incorporado com SHA-256 verificado, reconexão supervisionada e armazenamento opcional DPAPI. Idiomas PT-BR/EN/ES no instalador e troca no painel; ícones modernos, espaçamento do logo, ALFAMNA © 2026, logs exportáveis e opção de sessão sem prazo com confirmação explícita. A associação do túnel ao ChatGPT e a autorização dos usuários continuam exigindo consentimento individual. PRÉ-LANÇAMENTO: validar os fluxos novos em Windows real antes de distribuir amplamente." \
+            --title "NAVIX Desktop 0.2.7 — Reparo do túnel e diagnóstico" \
+            --notes "NavixX Desktop 0.2.7: corrige pacote oficial para incluir cloudflared.exe e manifesto, evita conflito com porta local 8080 usando porta de saúde dinâmica, limpa perfis de terminal antigos herdados, e classifica falhas do túnel sem registrar chaves nem tokens. Mantém wizard, DPAPI e idiomas da 0.2.6. PRÉ-LANÇAMENTO: instalação e autotestes em CI; requer nova validação real no PC do proprietário. Uso público simplificado ainda depende de backend gerenciado e consentimento." \
             --prerelease

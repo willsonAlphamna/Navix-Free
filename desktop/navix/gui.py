@@ -279,6 +279,8 @@ class Panel:
         self.diagnostics.record('tunnel', event, result,
                                 'error' if result == 'error' else 'info')
         self.events.put(('tunnel_event', event, result))
+        if event == 'tunnel.process_exited':
+            self.events.put(('tunnel_message', self.tunnel.error))
 
     def _launch_tunnel_worker(self):
         if self._tunnel_worker_running:

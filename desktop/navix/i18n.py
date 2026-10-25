@@ -122,8 +122,9 @@ WORDS = {
         'Once, enter your own OpenAI tunnel ID and restricted API key. NavixX checks connectivity, starts the bundled client and retries temporary failures.',
         'Una sola vez, introduce el ID del túnel y tu clave restringida de OpenAI. NavixX verifica la conexión, inicia el cliente incorporado e intenta reconectar tras fallos temporales.'),
     'ID do túnel (tunnel_…)': ('Tunnel ID (tunnel_…)', 'ID del túnel (tunnel_…)'),
-    'Chave da sua conta OpenAI (não aparece na tela)': (
-        'Your OpenAI account key (hidden)', 'Clave de tu cuenta OpenAI (oculta)'),
+    'Chave Runtime OpenAI (Tunnels Read + Use; oculta)': (
+        'OpenAI Runtime key (Tunnels Read + Use; hidden)',
+        'Clave Runtime OpenAI (Tunnels Read + Use; oculta)'),
     'Lembrar chave criptografada neste usuário Windows (DPAPI)': (
         'Remember encrypted key for this Windows user (DPAPI)',
         'Recordar clave cifrada para este usuario Windows (DPAPI)'),

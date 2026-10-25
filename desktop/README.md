@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.6 — conexão simplificada (pré-lançamento Windows)
+# Navix Desktop 0.2.7 — diagnóstico e reparo de túnel (pré-lançamento Windows)
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,9 +6,9 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.6.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
+1. Instale `NavixDesktop-Setup-0.2.7.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
 2. Abra NavixX, selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
-3. Para acesso ChatGPT, abra **Assistente → Conectar com ChatGPT**, informe seu próprio ID de Secure MCP Tunnel e uma chave restrita OpenAI. O cliente de túnel já está no instalador: **não precisa de PowerShell**.
+3. Para acesso ChatGPT, abra **Assistente → Conectar com ChatGPT**, informe seu próprio ID de Secure MCP Tunnel e uma **chave Runtime OpenAI com permissão Tunnels Read + Use**. O cliente de túnel e o companion oficial estão no instalador: **não precisa de PowerShell**.
 4. Opcionalmente marque **Lembrar chave criptografada neste usuário Windows**. O app usa DPAPI e tenta ligar o túnel depois que você autorizar uma nova sessão.
 5. No ChatGPT, vincule o túnel em **Plugins → + → Adicionar servidor MCP personalizado → Tunnel** e aceite os avisos. Esse consentimento individual não pode ser automatizado.
 6. **PARAR ACESSO** revoga a sessão e interrompe o túnel. O acesso temporário dura 30, 60, 120 ou 240 minutos; **Sem prazo** é opcional, exige confirmação extra e só dura enquanto o programa estiver aberto.
@@ -51,6 +51,22 @@ Usuários devem baixar apenas do GitHub Releases oficial e conferir a origem
 e o hash publicado. Não é necessário desligar o SmartScreen.
 
 ## Limites reais
+
+### Correção 0.2.7
+
+Após um relato real de **túnel que iniciava e caía**, foi detectado que o instalador
+0.2.6 incluía apenas `tunnel-client.exe`, omitindo `cloudflared.exe` e o manifesto
+do arquivo de distribuição oficial. Não foi possível provar que isso causou a
+queda relatada, mas a omissão do pacote precisava ser corrigida.
+
+A 0.2.7 copia os três arquivos a partir do ZIP upstream com SHA-256 validado e
+testa o reconhecimento do companion. Também utiliza uma porta local dinâmica
+para a interface de saúde (evitando o conflito da porta 8080), desconsidera
+perfis antigos herdados do terminal, e identifica códigos de autenticação,
+permissão e falha de rede sem gravar mensagens brutas ou credenciais em logs.
+Um diagnóstico local bem-sucedido **não garante** que o serviço remoto aceite
+uma chave; se o processo terminar, o motivo classificado aparece na Atividade.
+Esta versão continua **pré-lançamento** até o teste real no PC proprietário.
 
 - O servidor escuta apenas `127.0.0.1`, numa porta livre selecionada automaticamente. Outra máquina não pode conectar diretamente.
 - O programa **inicia o túnel sem terminal** depois de você informar sua própria identidade e chave. Ele não pode criar contas OpenAI, aprovar termos ou vincular um plugin ChatGPT sem sua ação. OAuth e serviço público multiusuário ainda não estão implementados.

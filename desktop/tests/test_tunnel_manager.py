@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from navix.tunnel_manager import TunnelManager, TunnelSettings, TUNNEL_ID
+from navix.tunnel_manager import TunnelManager, TunnelSettings, TUNNEL_ID, _diagnose_runtime_line
 
 
 ID = 'tunnel_' + 'a' * 32
@@ -55,6 +55,7 @@ def test_tunnel_setup_uses_environment_not_secrets_in_argv():
         assert options['env']['CONTROL_PLANE_API_KEY'] == 'sk-test-long-private-key-value'
         assert options['env']['MCP_SERVER_URL'] == 'http://127.0.0.1:3180/mcp'
         assert options['env']['MCP_EXTRA_HEADERS'] == 'Authorization: Bearer NAVIX_SECRET_BEARER'
+        assert options['env']['HEALTH_LISTEN_ADDR'] == '127.0.0.1:0'
     assert ('tunnel.started', 'ok') in events
     tunnel.stop()
     assert child.terminated
@@ -84,6 +85,24 @@ def test_service_port_change_requires_reconnect():
     tunnel.service.port = 6550
     assert tunnel.check() == 'reconectar'
     assert child.terminated
+
+
+def test_runtime_errors_are_classified_without_copying_secret_data():
+    assert '401' in _diagnose_runtime_line('HTTP 401: invalid runtime key sk-sensitive-secret')
+    assert '403' in _diagnose_runtime_line('request failed status 403 Forbidden')
+    assert 'Porta' in _diagnose_runtime_line('listen tcp: bind: address already in use')
+    assert 'cloudflared' in _diagnose_runtime_line('cloudflared.exe not found')
+    assert _diagnose_runtime_line('my secret sk-sensitive-secret') == ''
+
+
+def test_inherited_manual_profile_is_not_reused(monkeypatch):
+    monkeypatch.setenv('TUNNEL_CLIENT_PROFILE', 'old-navix')
+    monkeypatch.setenv('TUNNEL_CLIENT_CONFIG', 'C:/old-config.yaml')
+    tunnel, calls, _, _ = manager()
+    tunnel.configure(ID, 'sk-test-long-private-key-value')
+    tunnel.connect()
+    assert 'TUNNEL_CLIENT_PROFILE' not in calls[0][2]['env']
+    assert 'TUNNEL_CLIENT_CONFIG' not in calls[0][2]['env']
 
 
 def test_settings_do_not_save_plaintext_key_by_default(tmp_path):
