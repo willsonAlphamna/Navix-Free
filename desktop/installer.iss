@@ -1,4 +1,4 @@
-#define AppVersion "0.2.2"
+#define AppVersion "0.2.3"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
 AppName=Navix Desktop
@@ -12,6 +12,9 @@ OutputBaseFilename=NavixDesktop-Setup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+WizardImageFile=assets\wizard.png
+WizardSmallImageFile=assets\wizard-small.png
+DisableWelcomePage=no
 SetupIconFile=assets\navix.ico
 UninstallDisplayIcon={app}\NavixDesktop.exe
 ArchitecturesAllowed=x64compatible
@@ -25,4 +28,4 @@ Source: "dist\NavixDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 Name: "{group}\Navix Desktop"; Filename: "{app}\NavixDesktop.exe"
 Name: "{autodesktop}\Navix Desktop"; Filename: "{app}\NavixDesktop.exe"
 [Run]
-Filename: "{app}\NavixDesktop.exe"; Description: "Abrir Navix Desktop"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\NavixDesktop.exe"; Description: "Abrir NAVIX Desktop agora"; Flags: nowait postinstall skipifsilent

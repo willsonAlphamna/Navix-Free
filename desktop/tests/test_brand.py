@@ -1,0 +1,16 @@
+from navix.brand import icon_image, wizard_image
+
+
+def test_navix_icon_has_alpha_and_scales():
+    for size in (16, 32, 64, 256):
+        image = icon_image(size)
+        assert image.size == (size, size)
+        assert image.mode == 'RGBA'
+        assert image.getbbox() is not None
+
+
+def test_wizard_art_is_generated_without_network():
+    image = wizard_image()
+    assert image.size == (480, 918)
+    assert image.mode == 'RGB'
+    assert image.getpixel((10, 10)) != image.getpixel((10, 900))

@@ -15,6 +15,15 @@ from . import __version__
 
 
 class Panel:
+    """Native, low-memory Windows dashboard. All actions remain local and opt-in."""
+
+    COLORS = {
+        'base': '#0b1120', 'sidebar': '#101b2e', 'surface': '#152238',
+        'surface2': '#1b2c46', 'outline': '#273a56', 'text': '#f2f7ff',
+        'subtle': '#9fb1c9', 'blue': '#2878f0', 'blue_hover': '#4092ff',
+        'cyan': '#60d6e7', 'green': '#58d5a1', 'red': '#ef6477',
+    }
+
     def __init__(self, root):
         self.root = root
         directory = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NavixDesktop'
@@ -24,70 +33,275 @@ class Panel:
         self.events = queue.Queue()
         self.busy = False
         self.tray = None
-        self.root.title('Navix Desktop ' + __version__ + ' — Superconector')
-        self.root.geometry('820x790')
-        self.root.minsize(700, 720)
-        self.root.configure(bg='#111827')
+        self.browser_allowed = tk.BooleanVar(value=False)
+        self.desktop_allowed = tk.BooleanVar(value=False)
+        self.files_allowed = tk.BooleanVar(value=False)
+        self.commands_allowed = tk.BooleanVar(value=False)
+        self.duration_minutes = tk.IntVar(value=30)
+        self.state = tk.StringVar(value='DESCONECTADO — acesso desativado')
+        self.status_details = tk.StringVar(value='Ative uma sessão para usar as ferramentas locais.')
+        self.port_details = tk.StringVar(value='Aguardando inicialização')
+        self.permission_details = tk.StringVar(value='0 de 4 recursos autorizados')
+        self.activity_text = tk.StringVar(value='Aguardando a primeira ação')
+        self.root.title('NAVIX Desktop ' + __version__ + ' • Central de Controle')
+        self.root.geometry('1060x760')
+        self.root.minsize(890, 650)
+        self.root.configure(bg=self.COLORS['base'])
         icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent)) / 'assets/navix.ico'
         if icon.is_file():
             self.root.iconbitmap(str(icon))
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure('.', font=('Segoe UI', 11), background='#111827', foreground='#f3f4f6')
-        style.configure('TButton', padding=9, background='#2563eb', foreground='white')
-        style.configure('TCheckbutton', background='#111827', foreground='white')
-        frame = ttk.Frame(root, padding=24)
-        frame.pack(fill='both', expand=True)
-        ttk.Label(frame, text='N  NAVIX DESKTOP', font=('Segoe UI', 23, 'bold')).pack(anchor='w')
-        ttk.Label(frame, text='Seu computador. Suas permissões. Sua sessão.').pack(anchor='w', pady=(4, 18))
-        self.state = tk.StringVar(value='DESCONECTADO — acesso desativado')
-        ttk.Label(frame, textvariable=self.state, font=('Segoe UI', 12, 'bold'), wraplength=680).pack(anchor='w', pady=8)
-        self.browser_allowed = tk.BooleanVar()
-        self.desktop_allowed = tk.BooleanVar()
-        self.files_allowed = tk.BooleanVar()
-        self.commands_allowed = tk.BooleanVar()
-        self.duration_minutes = tk.IntVar(value=30)
-        ttk.Checkbutton(frame, text='Permitir navegador de automação', variable=self.browser_allowed,
-                        command=self.permissions_changed).pack(anchor='w', pady=4)
-        ttk.Checkbutton(frame, text='Permitir mouse, teclado e captura da tela inteira', variable=self.desktop_allowed,
-                        command=self.permissions_changed).pack(anchor='w', pady=4)
-        ttk.Checkbutton(frame, text='Permitir ler, editar, copiar, apagar e transferir arquivos', variable=self.files_allowed,
-                        command=self.permissions_changed).pack(anchor='w', pady=4)
-        ttk.Checkbutton(frame, text='Permitir executar PowerShell, Python e outros programas', variable=self.commands_allowed,
-                        command=self.permissions_changed).pack(anchor='w', pady=4)
-        ttk.Label(frame, text='Duração da autorização (minutos): 30, 60, 120 ou 240. Acesso restrito à conta Windows atual.',
-                  wraplength=680).pack(anchor='w', pady=(8, 2))
-        ttk.Combobox(frame, textvariable=self.duration_minutes, values=(30, 60, 120, 240),
-                     state='readonly', width=10).pack(anchor='w', pady=(0, 8))
-        ttk.Label(frame, text='Desmarcar uma permissão revoga a sessão. Acesso completo não supera a segurança do Windows.',
-                  wraplength=680).pack(anchor='w', pady=4)
-        row = ttk.Frame(frame)
-        row.pack(fill='x', pady=8)
-        ttk.Button(row, text='Marcar todas', command=self.select_all).pack(side='left', padx=(0,8))
-        ttk.Button(row, text='Conectar / Autorizar', command=self.connect).pack(side='left', padx=(0,8))
-        ttk.Button(row, text='PARAR ACESSO', command=self.stop).pack(side='left')
-        row2 = ttk.Frame(frame)
-        row2.pack(fill='x', pady=8)
-        ttk.Button(row2, text='Abrir navegador integrado', command=lambda:self.open_browser('integrado')).pack(side='left', padx=(0,8))
-        ttk.Button(row2, text='Abrir Opera', command=lambda:self.open_browser('opera')).pack(side='left')
-        row3 = ttk.Frame(frame)
-        row3.pack(fill='x', pady=8)
-        ttk.Button(row3, text='Copiar pareamento', command=self.copy_pairing).pack(side='left', padx=(0,8))
-        ttk.Button(row3, text='Diagnosticar', command=self.diagnose).pack(side='left', padx=(0,8))
-        ttk.Button(row3, text='Reparar conexão', command=self.repair).pack(side='left')
-        row4 = ttk.Frame(frame)
-        row4.pack(fill='x', pady=(0, 4))
-        ttk.Button(row4, text='Assistente para novos usuários', command=self.open_setup).pack(side='left')
-        self.output = tk.Text(frame, height=9, bg='#1f2937', fg='#e5e7eb', relief='flat',
-                              wrap='word', font=('Consolas', 10))
-        self.output.pack(fill='both', expand=True, pady=12)
-        self.show('Pronto para configurar. Marque as permissões e clique em Conectar.\n'
-                  'Pareamento local: cliente MCP com URL e cabeçalho Bearer.\n'
-                  'Acesso pela internet/ChatGPT exige integração autenticada compatível; não é automático.')
-        ttk.Button(frame, text='Minimizar na bandeja', command=self.hide).pack(anchor='w')
+        style.configure('Navix.TCombobox', fieldbackground='#243550', background='#243550',
+                        foreground='#ffffff', arrowcolor='#dce8fc', padding=7)
+        style.map('Navix.TCombobox', fieldbackground=[('readonly', '#243550')],
+                  foreground=[('readonly', '#ffffff')])
+        self._build_ui()
+        self.show('Pronto para configurar. Escolha as permissões e clique em Conectar / Autorizar.\n'
+                  'O servidor MCP funciona neste computador. Conexão remota exige autenticação própria.')
         self.setup_tray()
         self.root.protocol('WM_DELETE_WINDOW', self.close)
         self.root.after(500, self.tick)
+
+    def _text(self, parent, value, size=10, weight='normal', color=None, **kwargs):
+        return tk.Label(parent, text=value, bg=parent.cget('bg'),
+                        fg=color or self.COLORS['text'],
+                        font=('Segoe UI', size, weight), **kwargs)
+
+    def _button(self, parent, label, action, tone='neutral', **kwargs):
+        palette = {
+            'primary': (self.COLORS['blue'], '#ffffff', self.COLORS['blue_hover']),
+            'danger': ('#482738', '#ff9dac', '#5b2f43'),
+            'neutral': (self.COLORS['surface2'], self.COLORS['text'], '#304666'),
+            'subtle': (self.COLORS['sidebar'], self.COLORS['subtle'], self.COLORS['surface2']),
+        }
+        bg, fg, hover = palette[tone]
+        button = tk.Button(parent, text=label, command=action, bg=bg, fg=fg,
+                           activebackground=hover, activeforeground='#ffffff',
+                           cursor='hand2', relief='flat', bd=0,
+                           font=('Segoe UI', 10, 'bold'), padx=15, pady=11, **kwargs)
+        button.bind('<Enter>', lambda event: button.configure(bg=hover))
+        button.bind('<Leave>', lambda event: button.configure(bg=bg))
+        return button
+
+    def _card(self, parent, pad=18):
+        border = tk.Frame(parent, bg=self.COLORS['outline'], padx=1, pady=1)
+        inner = tk.Frame(border, bg=self.COLORS['surface'], padx=pad, pady=pad)
+        inner.pack(fill='both', expand=True)
+        return border, inner
+
+    def _section_title(self, parent, title, detail):
+        self._text(parent, title, 23, 'bold').pack(anchor='w')
+        self._text(parent, detail, 10, color=self.COLORS['subtle'],
+                   justify='left').pack(anchor='w', pady=(4, 20))
+
+    def _build_ui(self):
+        shell = tk.Frame(self.root, bg=self.COLORS['base'])
+        shell.pack(fill='both', expand=True)
+        side = tk.Frame(shell, width=228, bg=self.COLORS['sidebar'])
+        side.pack(side='left', fill='y')
+        side.pack_propagate(False)
+        brand = tk.Frame(side, bg=self.COLORS['sidebar'], padx=20, pady=24)
+        brand.pack(fill='x')
+        try:
+            from PIL import ImageTk
+            from .brand import icon_image
+            self.brand_photo = ImageTk.PhotoImage(icon_image(58))
+            tk.Label(brand, image=self.brand_photo, bg=self.COLORS['sidebar']).pack(side='left')
+        except Exception:
+            self._text(brand, 'N', 30, 'bold', self.COLORS['cyan']).pack(side='left')
+        wordmark = tk.Frame(brand, bg=self.COLORS['sidebar'])
+        wordmark.pack(side='left', padx=(10, 0))
+        self._text(wordmark, 'NAVIX', 17, 'bold').pack(anchor='w')
+        self._text(wordmark, 'DESKTOP', 9, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(side, 'CENTRAL DE CONTROLE', 8, 'bold', self.COLORS['subtle']).pack(
+            anchor='w', padx=22, pady=(20, 12))
+        self.nav_buttons = {}
+        for key, label in (
+            ('inicio', '⌂   Visão geral'),
+            ('permissoes', '✓   Permissões'),
+            ('ferramentas', '▣   Ferramentas'),
+            ('atividade', '≡   Atividade'),
+        ):
+            item = self._button(side, label, lambda selected=key: self.show_page(selected),
+                                tone='subtle', anchor='w')
+            item.pack(fill='x', padx=12, pady=4)
+            self.nav_buttons[key] = item
+        tk.Frame(side, bg=self.COLORS['outline'], height=1).pack(fill='x', padx=18, pady=(22, 12))
+        self._button(side, '★   Assistente de conexão', self.open_setup, tone='subtle',
+                     anchor='w').pack(fill='x', padx=12, pady=4)
+        self._button(side, '↙   Minimizar', self.hide, tone='subtle',
+                     anchor='w').pack(fill='x', padx=12, pady=4)
+        footer = tk.Frame(side, bg=self.COLORS['sidebar'])
+        footer.pack(side='bottom', fill='x', padx=20, pady=22)
+        self._text(footer, '●  CONTROLE LOCAL', 9, 'bold', self.COLORS['green']).pack(anchor='w')
+        self._text(footer, 'As permissões são temporárias.\nVersão ' + __version__,
+                   9, color=self.COLORS['subtle'], justify='left').pack(anchor='w', pady=(8, 0))
+        main = tk.Frame(shell, bg=self.COLORS['base'], padx=28, pady=26)
+        main.pack(side='left', fill='both', expand=True)
+        main.grid_rowconfigure(0, weight=1)
+        main.grid_columnconfigure(0, weight=1)
+        self.pages = {}
+        for key in ('inicio', 'permissoes', 'ferramentas', 'atividade'):
+            page = tk.Frame(main, bg=self.COLORS['base'])
+            page.grid(row=0, column=0, sticky='nsew')
+            self.pages[key] = page
+        self._home_page(self.pages['inicio'])
+        self._permissions_page(self.pages['permissoes'])
+        self._tools_page(self.pages['ferramentas'])
+        self._activity_page(self.pages['atividade'])
+        self.show_page('inicio')
+
+    def show_page(self, key):
+        self.pages[key].tkraise()
+        for page_key, button in self.nav_buttons.items():
+            active = page_key == key
+            button.configure(bg=self.COLORS['surface2'] if active else self.COLORS['sidebar'],
+                             fg=self.COLORS['text'] if active else self.COLORS['subtle'])
+
+    def _home_page(self, page):
+        self._section_title(page, 'Bem-vindo ao NAVIX', 'Seu computador e suas automações em um único lugar.')
+        frame, card = self._card(page, pad=24)
+        frame.pack(fill='x', pady=(0, 16))
+        top = tk.Frame(card, bg=self.COLORS['surface'])
+        top.pack(fill='x')
+        self._text(top, 'STATUS DA CONEXÃO', 9, 'bold', self.COLORS['cyan']).pack(side='left')
+        self._text(top, 'MCP LOCAL', 9, 'bold', self.COLORS['subtle']).pack(side='right')
+        self.status_label = self._text(card, '', 17, 'bold', self.COLORS['red'],
+                                       textvariable=self.state, anchor='w',
+                                       wraplength=610, justify='left')
+        # Remove literal text so textvariable is the single source of truth.
+        self.status_label.configure(text='')
+        self.status_label.pack(fill='x', pady=(15, 8))
+        self._text(card, '', 10, color=self.COLORS['subtle'],
+                   textvariable=self.status_details, anchor='w',
+                   justify='left').pack(fill='x')
+        actions = tk.Frame(card, bg=self.COLORS['surface'])
+        actions.pack(fill='x', pady=(20, 0))
+        self._button(actions, 'Conectar / Autorizar', lambda: self.show_page('permissoes'),
+                     tone='primary').pack(side='left', padx=(0, 9))
+        self._button(actions, 'PARAR ACESSO', self.stop, tone='danger').pack(side='left')
+        cards = tk.Frame(page, bg=self.COLORS['base'])
+        cards.pack(fill='x', pady=(0, 16))
+        left_edge, left = self._card(cards, pad=18)
+        left_edge.pack(side='left', fill='both', expand=True, padx=(0, 8))
+        self._text(left, 'SERVIDOR MCP', 9, 'bold', self.COLORS['subtle']).pack(anchor='w')
+        self._text(left, '', 11, 'bold', textvariable=self.port_details).pack(
+            anchor='w', pady=(10, 0))
+        right_edge, right = self._card(cards, pad=18)
+        right_edge.pack(side='left', fill='both', expand=True, padx=(8, 0))
+        self._text(right, 'PERMISSÕES ATIVAS', 9, 'bold', self.COLORS['subtle']).pack(anchor='w')
+        self._text(right, '', 11, 'bold', textvariable=self.permission_details).pack(
+            anchor='w', pady=(10, 0))
+        foot_edge, foot = self._card(page)
+        foot_edge.pack(fill='x')
+        self._text(foot, 'ACESSO RÁPIDO', 10, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(foot, 'Abra o navegador ou use o assistente para configurar o pareamento.',
+                   10, color=self.COLORS['subtle']).pack(anchor='w', pady=(7, 14))
+        buttons = tk.Frame(foot, bg=self.COLORS['surface'])
+        buttons.pack(fill='x')
+        self._button(buttons, 'Abrir navegador', lambda: self.open_browser('integrado'),
+                     tone='neutral').pack(side='left', padx=(0, 8))
+        self._button(buttons, 'Assistente de conexão', self.open_setup,
+                     tone='neutral').pack(side='left')
+        self._text(page, 'Última atividade', 10, 'bold', self.COLORS['subtle']).pack(
+            anchor='w', pady=(22, 4))
+        self._text(page, '', 10, color=self.COLORS['text'],
+                   textvariable=self.activity_text, wraplength=650,
+                   anchor='w', justify='left').pack(fill='x')
+
+    def _permission_item(self, parent, flag, title, subtitle):
+        wrap = tk.Frame(parent, bg=self.COLORS['surface2'], pady=8, padx=12)
+        wrap.pack(fill='x', pady=5)
+        control = tk.Checkbutton(wrap, text=title, variable=flag,
+                                 command=self.permissions_changed, bg=self.COLORS['surface2'],
+                                 fg=self.COLORS['text'], selectcolor=self.COLORS['base'],
+                                 activebackground=self.COLORS['surface2'],
+                                 activeforeground='#ffffff', anchor='w', cursor='hand2',
+                                 font=('Segoe UI', 10, 'bold'), padx=7, pady=2)
+        control.pack(fill='x')
+        self._text(wrap, subtitle, 9, color=self.COLORS['subtle']).pack(
+            anchor='w', padx=31)
+
+    def _permissions_page(self, page):
+        self._section_title(page, 'Permissões e segurança',
+                            'Escolha exatamente o que o NAVIX pode controlar neste PC.')
+        frame, card = self._card(page, pad=18)
+        frame.pack(fill='x', pady=(0, 15))
+        self._permission_item(card, self.browser_allowed, 'Navegador',
+                              'Abrir páginas, clicar, preencher e baixar arquivos autorizados.')
+        self._permission_item(card, self.desktop_allowed, 'Mouse, teclado e tela',
+                              'Controlar a área de trabalho e capturar imagens.')
+        self._permission_item(card, self.files_allowed, 'Arquivos e pastas',
+                              'Ler, criar, editar, mover ou apagar arquivos.')
+        self._permission_item(card, self.commands_allowed, 'Comandos e programas',
+                              'Executar PowerShell, Python e outros programas.')
+        row = tk.Frame(page, bg=self.COLORS['base'])
+        row.pack(fill='x', pady=(0, 15))
+        self._text(row, 'Tempo de autorização:', 10, 'bold').pack(side='left', padx=(0, 10))
+        ttk.Combobox(row, textvariable=self.duration_minutes, values=(30, 60, 120, 240),
+                     style='Navix.TCombobox', state='readonly', width=7).pack(side='left')
+        self._text(row, 'minutos', 10, color=self.COLORS['subtle']).pack(side='left', padx=10)
+        actions = tk.Frame(page, bg=self.COLORS['base'])
+        actions.pack(fill='x')
+        self._button(actions, 'Marcar todas', self.select_all).pack(side='left', padx=(0, 8))
+        self._button(actions, 'Conectar / Autorizar', self.connect,
+                     tone='primary').pack(side='left', padx=(0, 8))
+        self._button(actions, 'PARAR ACESSO', self.stop, tone='danger').pack(side='left')
+        self._text(page, 'Alterar qualquer permissão revoga a sessão atual.\n'
+                   'Acesso completo exige sua confirmação; não ultrapassa os limites do Windows.',
+                   9, color=self.COLORS['subtle'], justify='left').pack(anchor='w', pady=(16, 0))
+
+    def _tools_page(self, page):
+        self._section_title(page, 'Ferramentas', 'Navegação, diagnóstico e pareamento em áreas separadas.')
+        web_edge, web = self._card(page)
+        web_edge.pack(fill='x', pady=(0, 16))
+        self._text(web, 'NAVEGAÇÃO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(web, 'O navegador usa perfil próprio de automação.',
+                   10, color=self.COLORS['subtle']).pack(anchor='w', pady=(7, 14))
+        row = tk.Frame(web, bg=self.COLORS['surface'])
+        row.pack(fill='x')
+        self._button(row, 'Abrir navegador integrado',
+                     lambda: self.open_browser('integrado'), tone='primary').pack(
+            side='left', padx=(0, 8))
+        self._button(row, 'Abrir Opera',
+                     lambda: self.open_browser('opera')).pack(side='left')
+        system_edge, system = self._card(page)
+        system_edge.pack(fill='x', pady=(0, 16))
+        self._text(system, 'DIAGNÓSTICO E REPARO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(system, 'Veja o estado real do servidor ou reinicie uma conexão parada.',
+                   10, color=self.COLORS['subtle']).pack(anchor='w', pady=(7, 14))
+        row = tk.Frame(system, bg=self.COLORS['surface'])
+        row.pack(fill='x')
+        self._button(row, 'Diagnosticar', self.diagnose).pack(side='left', padx=(0, 8))
+        self._button(row, 'Reparar conexão', self.repair).pack(side='left')
+        pair_edge, pair = self._card(page)
+        pair_edge.pack(fill='x')
+        self._text(pair, 'PAREAMENTO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(pair, 'Copie a credencial apenas para um cliente MCP autorizado.\n'
+                   'Acesso pela internet não é ativado automaticamente.',
+                   10, color=self.COLORS['subtle'], justify='left').pack(
+            anchor='w', pady=(7, 14))
+        row = tk.Frame(pair, bg=self.COLORS['surface'])
+        row.pack(fill='x')
+        self._button(row, 'Copiar pareamento', self.copy_pairing,
+                     tone='primary').pack(side='left', padx=(0, 8))
+        self._button(row, 'Assistente', self.open_setup).pack(side='left')
+
+    def _activity_page(self, page):
+        self._section_title(page, 'Atividade e eventos',
+                            'Mensagens locais da sessão. O histórico de auditoria fica no computador.')
+        log_edge, log_frame = self._card(page, pad=12)
+        log_edge.pack(fill='both', expand=True)
+        self.output = tk.Text(log_frame, bg='#0e192a', fg='#dbeafa', insertbackground='white',
+                              selectbackground='#305f9e', relief='flat', highlightthickness=0,
+                              wrap='word', font=('Consolas', 10), padx=12, pady=12)
+        scroll = ttk.Scrollbar(log_frame, orient='vertical', command=self.output.yview)
+        self.output.configure(yscrollcommand=scroll.set)
+        scroll.pack(side='right', fill='y')
+        self.output.pack(side='left', fill='both', expand=True)
+        self._button(page, 'Limpar visualização', lambda: self.output.delete('1.0', 'end')
+                     ).pack(anchor='e', pady=(12, 0))
 
     def setup_tray(self):
         if sys.platform != 'win32':
@@ -114,6 +328,8 @@ class Panel:
     def show(self, text):
         self.output.insert('end', text + '\n')
         self.output.see('end')
+        if hasattr(self, 'activity_text'):
+            self.activity_text.set(text.splitlines()[-1][:140])
 
     def permissions_changed(self):
         self.stop()
@@ -230,6 +446,12 @@ class Panel:
             self.state.set('SERVIDOR INDISPONÍVEL — clique em Diagnosticar')
         else:
             self.state.set('DESCONECTADO — acesso desativado')
+        self.status_details.set('Servidor ativo somente neste computador.' if status['active'] and self.service.ready
+                                else 'Sessão inativa. Autorize novamente para conectar.')
+        self.port_details.set('Porta local: ' + str(self.service.port) if self.service.ready else 'Serviço não iniciado')
+        self.permission_details.set(str(len(status['permissions']) if status['active'] else 0) + ' de 4 recursos autorizados')
+        self.status_label.configure(fg=self.COLORS['green'] if status['active'] and self.service.ready
+                                    else self.COLORS['red'])
         self.root.after(500, self.tick)
 
     def close(self):

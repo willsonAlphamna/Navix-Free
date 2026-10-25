@@ -45,59 +45,69 @@ def local_diagnostic(panel):
 
 
 def open_assistant(panel):
+    """Accessible, themed onboarding. User consent remains in the main panel."""
     dialog = tk.Toplevel(panel.root)
-    dialog.title('NAVIX Desktop — assistente de conexão')
-    dialog.geometry('710x660')
-    dialog.minsize(650, 570)
+    dialog.title('NAVIX Desktop — Assistente de conexão')
+    dialog.geometry('770x710')
+    dialog.minsize(690, 660)
+    dialog.configure(bg=panel.COLORS['base'])
     dialog.transient(panel.root)
-    frame = ttk.Frame(dialog, padding=20)
-    frame.pack(fill='both', expand=True)
-    ttk.Label(frame, text='Configurar NAVIX Desktop', font=('Segoe UI', 19, 'bold')).pack(anchor='w')
-    ttk.Label(frame, text='Passo a passo para uso próprio ou instalação por outras pessoas.',
-              wraplength=650).pack(anchor='w', pady=(4, 12))
+    page = tk.Frame(dialog, bg=panel.COLORS['base'], padx=28, pady=24)
+    page.pack(fill='both', expand=True)
+    panel._text(page, 'Vamos configurar seu NAVIX', 21, 'bold').pack(anchor='w')
+    panel._text(page, 'Três etapas claras para deixar o programa pronto no seu computador.',
+                10, color=panel.COLORS['subtle']).pack(anchor='w', pady=(6, 18))
 
-    first = ttk.LabelFrame(frame, text='1. Ativar no próprio computador', padding=12)
-    first.pack(fill='x', pady=6)
-    ttk.Label(first, text='No painel principal, selecione as permissões e clique em Conectar / Autorizar. '
-              'Cada computador concede suas próprias permissões; nenhuma vem habilitada de fábrica.',
-              wraplength=620).pack(anchor='w')
+    def step(number, title, detail):
+        outer, inside = panel._card(page, pad=14)
+        outer.pack(fill='x', pady=5)
+        header = tk.Frame(inside, bg=panel.COLORS['surface'])
+        header.pack(fill='x')
+        panel._text(header, str(number).zfill(2), 12, 'bold',
+                    panel.COLORS['cyan']).pack(side='left', padx=(0, 12))
+        panel._text(header, title, 12, 'bold').pack(side='left')
+        panel._text(inside, detail, 10, color=panel.COLORS['subtle'],
+                    justify='left', wraplength=635).pack(anchor='w', pady=(8, 0))
+        return inside
 
-    second = ttk.LabelFrame(frame, text='2. Parear um cliente MCP local', padding=12)
-    second.pack(fill='x', pady=6)
-    ttk.Label(second, text='Com o servidor pronto, copie a URL local e o cabeçalho de autenticação '
-              'somente para um cliente MCP confiável neste computador. Nunca publique esse conteúdo.',
-              wraplength=620).pack(anchor='w', pady=(0, 6))
-    ttk.Button(second, text='Copiar pareamento protegido', command=panel.copy_pairing).pack(anchor='w')
+    step(1, 'Autorize no Windows',
+         'No painel principal, abra Permissões, marque os recursos desejados e clique em '
+         'Conectar / Autorizar. O acesso nunca vem habilitado de fábrica.')
+    local = step(2, 'Pareie um cliente MCP local',
+                 'Quando o servidor estiver pronto, copie o pareamento somente para '
+                 'um cliente confiável. Não publique esse código nem envie por e-mail.')
+    panel._button(local, 'Copiar pareamento protegido', panel.copy_pairing,
+                  tone='primary').pack(anchor='w', pady=(10, 0))
+    remote = step(3, 'Acesso externo ao ChatGPT/Codex',
+                  'O servidor local não abre acesso à internet. É necessário configurar '
+                  'conexão autenticada própria para cada pessoa e computador.')
+    links = tk.Frame(remote, bg=panel.COLORS['surface'])
+    links.pack(anchor='w', pady=(10, 0))
+    panel._button(links, 'Configurações OpenAI', lambda: webbrowser.open(TUNNEL_SETTINGS)
+                  ).pack(side='left', padx=(0, 8))
+    panel._button(links, 'Guia oficial', lambda: webbrowser.open(TUNNEL_GUIDE)
+                  ).pack(side='left')
 
-    third = ttk.LabelFrame(frame, text='3. Conectar ChatGPT ou Codex pela internet', padding=12)
-    third.pack(fill='x', pady=6)
-    ttk.Label(third, text='O servidor local não fica acessível na internet automaticamente. '
-              'Uma conexão externa exige autenticação própria, permissões da conta OpenAI '
-              'e um túnel ou serviço HTTPS compatível. O túnel de outra pessoa não serve.',
-              wraplength=620).pack(anchor='w', pady=(0, 6))
-    row = ttk.Frame(third)
-    row.pack(anchor='w')
-    ttk.Button(row, text='Abrir túneis OpenAI',
-               command=lambda: webbrowser.open(TUNNEL_SETTINGS)).pack(side='left', padx=(0, 8))
-    ttk.Button(row, text='Ler guia oficial',
-               command=lambda: webbrowser.open(TUNNEL_GUIDE)).pack(side='left')
-
-    diagnostic = tk.StringVar()
-    fourth = ttk.LabelFrame(frame, text='Diagnóstico da instalação', padding=12)
-    fourth.pack(fill='both', expand=True, pady=8)
-    ttk.Label(fourth, textvariable=diagnostic, wraplength=620, justify='left').pack(anchor='w')
+    diagnostic_edge, diagnostic = panel._card(page, pad=15)
+    diagnostic_edge.pack(fill='both', expand=True, pady=(14, 8))
+    panel._text(diagnostic, 'DIAGNÓSTICO LOCAL', 10, 'bold', panel.COLORS['cyan']).pack(anchor='w')
+    summary = tk.StringVar()
 
     def refresh():
         data = local_diagnostic(panel)
-        local = 'PRONTO' if data['server_ready'] and data['session_active'] else 'NÃO AUTORIZADO / INDISPONÍVEL'
-        components = ', '.join(f'{key}: {value}' for key, value in data['packages'].items())
-        diagnostic.set(
-            f'Servidor MCP local: {local}\n'
-            f'Porta: {data["port"]}\n'
-            f'Permissões nesta sessão: {", ".join(data["permissions"]) or "nenhuma"}\n'
-            f'Cliente de túnel encontrado: {"sim" if data["tunnel_client_found"] else "não"}\n'
-            f'Componentes: {components}\n'
-            'Conexão externa: não confirmada neste diagnóstico.'
+        ready = data['server_ready'] and data['session_active']
+        summary.set(
+            f"Servidor MCP: {'PRONTO' if ready else 'PARADO / NÃO AUTORIZADO'}   |   "
+            f"Porta: {data['port']}\n"
+            f"Permissões: {', '.join(data['permissions']) or 'nenhuma'}\n"
+            f"Cliente de túnel detectado: {'sim' if data['tunnel_client_found'] else 'não'}\n"
+            'Conexão externa: não confirmada por este diagnóstico.'
         )
-    ttk.Button(fourth, text='Atualizar diagnóstico', command=refresh).pack(anchor='w', pady=(8, 0))
+    panel._text(diagnostic, '', 10, color=panel.COLORS['text'],
+                textvariable=summary, justify='left', wraplength=635).pack(
+        anchor='w', pady=(10, 8))
+    buttons = tk.Frame(diagnostic, bg=panel.COLORS['surface'])
+    buttons.pack(anchor='w')
+    panel._button(buttons, 'Atualizar diagnóstico', refresh).pack(side='left', padx=(0, 8))
+    panel._button(buttons, 'Fechar', dialog.destroy).pack(side='left')
     refresh()

@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.2 — piloto Windows
+# Navix Desktop 0.2.3 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,7 +6,7 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.2.exe` na sua conta Windows, sem administrador.
+1. Instale `NavixDesktop-Setup-0.2.3.exe` na sua conta Windows, sem administrador.
 2. Abra Navix Desktop, selecione as permissões (ou **Marcar todas**), escolha a duração e clique em **Conectar / Autorizar**. O acesso completo exige confirmação explícita.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
@@ -28,6 +28,27 @@ executam com os privilégios da conta Windows que abriu o aplicativo.
 além de Playwright, PyAutoGUI, Pillow e MCP. Ele não é uma instalação geral de Python
 nem um gerenciador pip; para pacotes adicionais use um interpretador instalado. Na
 execução a partir dos fontes, usa o mesmo Python que iniciou o aplicativo.
+
+
+## Visual e instalação — versão 0.2.3
+
+O painel Windows foi reorganizado em **Visão geral**, **Permissões**,
+**Ferramentas** e **Atividade**. Todas as ações do piloto anterior continuam
+acessíveis, inclusive autorização explícita e revogação de sessão. O novo
+ícone é uma interpretação própria de circuitos eletrônicos e da letra N.
+O logotipo original do canal Circuito Vivo não foi incorporado porque o
+arquivo-fonte exato ainda não foi confirmado.
+
+O instalador tem visual NAVIX e uma opção **Abrir NAVIX Desktop agora** ao
+final. O navegador e o Windows controlam a barra de downloads e o diálogo
+de reputação do SmartScreen. Uma página ou instalador não consegue forçar o
+botão **Abrir** no navegador nem transformar o alerta do SmartScreen em dois
+botões disponíveis inicialmente. Para distribuição profissional, assinar o
+executável com certificado confiável e avaliar a Microsoft Store. A assinatura
+não garante eliminação imediata de avisos; reputação pode levar tempo.
+
+Usuários devem baixar apenas do GitHub Releases oficial e conferir a origem
+e o hash publicado. Não é necessário desligar o SmartScreen.
 
 ## Limites reais
 
