@@ -75,6 +75,9 @@ class Panel:
         ttk.Button(row3, text='Copiar pareamento', command=self.copy_pairing).pack(side='left', padx=(0,8))
         ttk.Button(row3, text='Diagnosticar', command=self.diagnose).pack(side='left', padx=(0,8))
         ttk.Button(row3, text='Reparar conexão', command=self.repair).pack(side='left')
+        row4 = ttk.Frame(frame)
+        row4.pack(fill='x', pady=(0, 4))
+        ttk.Button(row4, text='Assistente para novos usuários', command=self.open_setup).pack(side='left')
         self.output = tk.Text(frame, height=9, bg='#1f2937', fg='#e5e7eb', relief='flat',
                               wrap='word', font=('Consolas', 10))
         self.output.pack(fill='both', expand=True, pady=12)
@@ -173,6 +176,10 @@ class Panel:
         self.root.clipboard_clear()
         self.root.clipboard_append(json.dumps(data, indent=2))
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
+
+    def open_setup(self):
+        from .setup_assistant import open_assistant
+        open_assistant(self)
 
     def diagnose(self):
         self.show('Navix Desktop ' + __version__)

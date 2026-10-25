@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.1 — piloto Windows
+# Navix Desktop 0.2.2 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,7 +6,7 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.1.exe` na sua conta Windows, sem administrador.
+1. Instale `NavixDesktop-Setup-0.2.2.exe` na sua conta Windows, sem administrador.
 2. Abra Navix Desktop, selecione as permissões (ou **Marcar todas**), escolha a duração e clique em **Conectar / Autorizar**. O acesso completo exige confirmação explícita.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
@@ -128,3 +128,28 @@ devem ser obtidos no runner Windows e no computador de destino antes da homologa
 ## Correção 0.1.1
 
 Reparar conexão preserva a sessão ativa e seu prazo original. Não renova credenciais nem autoriza sessões encerradas. Servidores encerrados são recriados e iniciados; nesse caso, copie novamente o pareamento pela nova porta. Abrir navegador sem autorização mostra a ação necessária no painel. A integração remota com ChatGPT continua pendente.
+
+## Instalação por outras pessoas e configuração guiada
+
+No painel, clique em **Assistente para novos usuários**. Ele mostra as três
+etapas: autorizar no próprio Windows, parear um cliente MCP local e consultar
+as opções oficiais para uma conexão externa autenticada. O botão de pareamento
+só copia a credencial quando a sessão local estiver ativa; não envia token
+à internet nem inclui nenhuma chave de API no instalador.
+
+O instalador é distribuível como programa Windows independente. Isso **não**
+significa que cada usuário terá ChatGPT remoto automaticamente: o usuário ou
+uma futura plataforma de pareamento deverá configurar identidade e conexão.
+O Secure MCP Tunnel é uma solução privada; publicar um plugin com servidor
+remoto exige HTTPS estável e autenticação. A publicação de plugins MCP locais
+de execução desktop está sujeita a elegibilidade de parceiros aprovados.
+
+Documentação:
+- https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+- https://developers.openai.com/plugins/deploy/desktop-only
+- https://developers.openai.com/plugins/build/mcp-server
+
+A configuração de uma infraestrutura pública e multiusuário é um trabalho
+separado, com autenticação por usuário, isolamento de dispositivos, consentimento
+granular, auditoria e hospedagem. Não se deve compartilhar tokens nem túneis
+entre instalações.
