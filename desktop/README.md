@@ -1,4 +1,4 @@
-# Navix Desktop 0.1.0 — piloto Windows
+# Navix Desktop 0.1.1 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,7 +6,7 @@ a Opera e automação de desktop autorizada por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.1.0.exe` na sua conta Windows, sem administrador.
+1. Instale `NavixDesktop-Setup-0.1.1.exe` na sua conta Windows, sem administrador.
 2. Abra Navix Desktop, selecione as permissões e clique em **Conectar / Autorizar**.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
@@ -72,3 +72,7 @@ Não confundir configuração do workflow com resultado aprovado.
 - https://pyinstaller.org/en/stable/usage.html
 - https://pyautogui.readthedocs.io/en/latest/
 - https://jrsoftware.org/ishelp/
+
+## Correção 0.1.1
+
+Reparar conexão preserva a sessão ativa e seu prazo original. Não renova credenciais nem autoriza sessões encerradas. Servidores encerrados são recriados e iniciados; nesse caso, copie novamente o pareamento pela nova porta. Abrir navegador sem autorização mostra a ação necessária no painel. A integração remota com ChatGPT continua pendente.

@@ -67,7 +67,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.1.0.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.1.1.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }

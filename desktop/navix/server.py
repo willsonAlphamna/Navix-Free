@@ -114,7 +114,7 @@ def make_app(session, browser, desktop, port=8765):
     # Must wrap the app including its MCP lifecycle, not mount a second app.
     app.add_middleware(TokenAuth, session=session)
     async def health(request):
-        return JSONResponse({'service': 'navix-desktop', 'version': '0.1.0'})
+        return JSONResponse({'service': 'navix-desktop', 'version': '0.1.1'})
     app.routes.append(Route('/health', health))
     return app
 

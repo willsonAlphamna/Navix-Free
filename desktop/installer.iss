@@ -1,4 +1,4 @@
-#define AppVersion "0.1.0"
+#define AppVersion "0.1.1"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
 AppName=Navix Desktop
@@ -8,7 +8,7 @@ DefaultDirName={localappdata}\Programs\NavixDesktop
 DefaultGroupName=Navix Desktop
 PrivilegesRequired=lowest
 OutputDir=output
-OutputBaseFilename=NavixDesktop-Setup-0.1.0
+OutputBaseFilename=NavixDesktop-Setup-0.1.1
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
