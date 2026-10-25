@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import queue
+import sys
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -21,10 +22,14 @@ class Panel:
         self.service = Service(self.session, self.browser, Desktop(self.session))
         self.events = queue.Queue()
         self.busy = False
+        self.tray = None
         self.root.title('Navix Desktop — Superconector')
         self.root.geometry('760x640')
         self.root.minsize(650, 580)
         self.root.configure(bg='#111827')
+        icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent)) / 'assets/navix.ico'
+        if icon.is_file():
+            self.root.iconbitmap(str(icon))
         style = ttk.Style()
         style.theme_use('clam')
         style.configure('.', font=('Segoe UI', 11), background='#111827', foreground='#f3f4f6')
@@ -63,8 +68,32 @@ class Panel:
         self.show('Pronto para configurar. Marque as permissões e clique em Conectar.\n'
                   'Pareamento local: cliente MCP com URL e cabeçalho Bearer.\n'
                   'Acesso pela internet/ChatGPT exige integração autenticada compatível; não é automático.')
+        ttk.Button(frame, text='Minimizar na bandeja', command=self.hide).pack(anchor='w')
+        self.setup_tray()
         self.root.protocol('WM_DELETE_WINDOW', self.close)
         self.root.after(500, self.tick)
+
+    def setup_tray(self):
+        if sys.platform != 'win32':
+            return
+        try:
+            import pystray
+            from .brand import icon_image
+            menu = pystray.Menu(
+                pystray.MenuItem('Abrir painel', lambda icon, item: self.events.put(('show',))),
+                pystray.MenuItem('Interromper acesso', lambda icon, item: self.events.put(('stop',))),
+                pystray.MenuItem('Sair', lambda icon, item: self.events.put(('exit',))))
+            self.tray = pystray.Icon('NavixDesktop', icon_image(), 'Navix Desktop', menu)
+            threading.Thread(target=self.tray.run, daemon=True).start()
+        except Exception:
+            self.tray = None
+            self.show('Ícone da bandeja indisponível; mantenha o painel aberto.')
+
+    def hide(self):
+        if self.tray and self.tray.visible:
+            self.root.withdraw()
+        else:
+            self.root.iconify()
 
     def show(self, text):
         self.output.insert('end', text + '\n')
@@ -104,7 +133,7 @@ class Panel:
         threading.Thread(target=work, daemon=True).start()
 
     def copy_pairing(self):
-        if not self.session.status()['active'] or not self.service.server.started:
+        if not self.session.status()['active'] or not self.service.ready:
             messagebox.showinfo('Navix', 'Conecte e aguarde o servidor ficar pronto.')
             return
         data = {'url': 'http://127.0.0.1:8765/mcp',
@@ -114,7 +143,7 @@ class Panel:
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
 
     def diagnose(self):
-        self.show('Servidor MCP: ' + ('pronto' if self.service.server.started else 'parado ou iniciando'))
+        self.show('Servidor MCP: ' + ('pronto' if self.service.ready else 'parado ou iniciando'))
         self.show('Sessão: ' + json.dumps(self.session.status(), ensure_ascii=False))
         for package in ('mcp', 'playwright', 'PyAutoGUI', 'Pillow'):
             try:
@@ -136,9 +165,16 @@ class Panel:
         while not self.events.empty():
             event = self.events.get_nowait()
             if event is None: self.busy = False
+            elif event == ('show',):
+                self.root.deiconify()
+                self.root.lift()
+            elif event == ('stop',): self.stop()
+            elif event == ('exit',):
+                self.close()
+                return
             else: self.show(event)
         status = self.session.status()
-        if status['active'] and self.service.server.started:
+        if status['active'] and self.service.ready:
             self.state.set('LOCAL PRONTO — sessão autorizada: %ds' % status['remaining_seconds'])
         elif status['active']:
             self.state.set('SERVIDOR INDISPONÍVEL — verifique porta 8765 / Diagnosticar')
@@ -147,6 +183,8 @@ class Panel:
         self.root.after(500, self.tick)
 
     def close(self):
+        if self.tray:
+            self.tray.stop()
         self.session.stop()
         self.service.close()
         try:

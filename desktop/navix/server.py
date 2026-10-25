@@ -130,6 +130,10 @@ class Service:
             self.thread = threading.Thread(target=self.server.run, daemon=True, name='navix-mcp')
             self.thread.start()
 
+    @property
+    def ready(self):
+        return bool(self.thread and self.thread.is_alive() and self.server.started and not self.server.should_exit)
+
     def close(self):
         self.server.should_exit = True
         if self.thread:

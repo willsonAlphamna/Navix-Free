@@ -4,6 +4,9 @@ on:
     branches: [feature/navix-desktop-zero]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
+concurrency:
+  group: navix-desktop-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -35,8 +38,9 @@ jobs:
           $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
           python -m playwright install --no-shell chromium
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m navix.brand
           python -m pip freeze | Out-File -Encoding utf8 DEPENDENCIES.txt
-          python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
+          python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --icon assets/navix.ico --add-data "assets;assets" --hidden-import pystray._win32 --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verificar abertura do executável
         shell: pwsh
