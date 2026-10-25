@@ -222,8 +222,16 @@ class Panel:
         self._button(panel, 'Criar login e entrar' if create else 'Entrar no NavixX',
                      submit, tone='primary').pack(fill='x', pady=(7, 0))
         entry.bind('<Return>', lambda event: submit())
-        box.grab_set()
-        entry.focus_set()
+        # Tk can reject a grab until Windows has actually mapped the dialog.
+        def activate_login_dialog():
+            if not box.winfo_exists():
+                return
+            try:
+                box.grab_set()
+                entry.focus_force()
+            except tk.TclError:
+                box.after(100, activate_login_dialog)
+        box.after(100, activate_login_dialog)
 
     def lock_panel(self):
         """Lock always revokes remote control, including unlimited sessions."""
