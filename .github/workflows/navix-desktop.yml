@@ -33,10 +33,10 @@ jobs:
         shell: pwsh
         run: |
           $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
-          python -m playwright install chromium
+          python -m playwright install --no-shell chromium
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m pip freeze | Out-File -Encoding utf8 DEPENDENCIES.txt
-          python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --collect-all playwright --collect-all mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
+          python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verificar abertura do executável
         shell: pwsh
