@@ -72,3 +72,15 @@ def test_long_explicit_session_and_invalid_durations(tmp_path):
     for duration in (0, 241, True, 2.5):
         with pytest.raises(ValueError):
             session.activate(['browser'], minutes=duration)
+
+
+def test_no_expiry_is_opt_in_and_revoked_on_stop(tmp_path):
+    session = Session(tmp_path, clock=lambda: 100)
+    session.activate(['browser'], minutes=None)
+    assert session.status()['unlimited'] is True
+    assert session.status()['remaining_seconds'] is None
+    session.require('browser')
+    session.stop()
+    assert not session.status()['active']
+    with pytest.raises(PermissionError):
+        session.require('browser')

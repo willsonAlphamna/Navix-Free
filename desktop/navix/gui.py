@@ -3,14 +3,18 @@ import json
 import os
 from pathlib import Path
 import queue
+import subprocess
 import sys
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from .core import Session
 from .browser import Browser
 from .desktop import Desktop
 from .server import Service
+from .diagnostics import Diagnostics
+from .i18n import LANGUAGES, load_language, save_language, translate
+from .tunnel_manager import TunnelManager, TunnelSettings
 from . import __version__
 
 
@@ -27,17 +31,41 @@ class Panel:
     def __init__(self, root):
         self.root = root
         directory = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NavixDesktop'
+        self.directory = directory
+        installer_lang = None
+        if '--lang' in sys.argv:
+            try:
+                installer_lang = sys.argv[sys.argv.index('--lang') + 1]
+            except IndexError:
+                pass
+        self.language = load_language(directory, installer_lang)
+        self.selected_language_name = tk.StringVar(value=LANGUAGES[self.language])
         self.session = Session(directory)
+        self.diagnostics = Diagnostics(directory)
         self.browser = Browser(self.session)
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
+        self.tunnel_settings = TunnelSettings(directory)
+        self.tunnel = TunnelManager(self.session, self.service, self._tunnel_event)
+        self.tunnel_state = tk.StringVar(value='Túnel desligado')
+        self._tunnel_worker_running = False
+        self._last_tunnel_state = ''
+        self._last_health = None
+        self._flag_timer = None
         self.events = queue.Queue()
         self.busy = False
         self.tray = None
-        self.browser_allowed = tk.BooleanVar(value=False)
-        self.desktop_allowed = tk.BooleanVar(value=False)
-        self.files_allowed = tk.BooleanVar(value=False)
-        self.commands_allowed = tk.BooleanVar(value=False)
-        self.duration_minutes = tk.IntVar(value=30)
+        self._permission_preferences = directory / 'permissions.json'
+        try:
+            preferred = json.loads(self._permission_preferences.read_text(encoding='utf-8'))
+            preferred = preferred if isinstance(preferred, list) else []
+        except (OSError, ValueError):
+            preferred = []
+        # Remember checkboxes only, never an authorization or an active token.
+        self.browser_allowed = tk.BooleanVar(value='browser' in preferred)
+        self.desktop_allowed = tk.BooleanVar(value='desktop' in preferred)
+        self.files_allowed = tk.BooleanVar(value='files' in preferred)
+        self.commands_allowed = tk.BooleanVar(value='commands' in preferred)
+        self.duration_minutes = tk.StringVar(value='30')
         self.state = tk.StringVar(value='DESCONECTADO — acesso desativado')
         self.status_details = tk.StringVar(value='Ative uma sessão para usar as ferramentas locais.')
         self.port_details = tk.StringVar(value='Aguardando inicialização')
@@ -72,7 +100,7 @@ class Panel:
         self.root.after(1600, self.diagnose)
 
     def _text(self, parent, value, size=10, weight='normal', color=None, **kwargs):
-        return tk.Label(parent, text=value, bg=parent.cget('bg'),
+        return tk.Label(parent, text=translate(value, self.language), bg=parent.cget('bg'),
                         fg=color or self.COLORS['text'],
                         font=('Segoe UI', size, weight), **kwargs)
 
@@ -84,7 +112,7 @@ class Panel:
             'subtle': (self.COLORS['sidebar'], self.COLORS['subtle'], self.COLORS['surface2']),
         }
         bg, fg, hover = palette[tone]
-        button = tk.Button(parent, text=label, command=action, bg=bg, fg=fg,
+        button = tk.Button(parent, text=translate(label, self.language), command=action, bg=bg, fg=fg,
                            activebackground=hover, activeforeground='#ffffff',
                            cursor='hand2', relief='raised', bd=1,
                            font=('Segoe UI', 10, 'bold'), padx=15, pady=11, **kwargs)
@@ -116,6 +144,7 @@ class Panel:
 
     def _build_ui(self):
         shell = tk.Frame(self.root, bg=self.COLORS['base'])
+        self.shell = shell
         shell.pack(fill='both', expand=True)
         side = tk.Frame(shell, width=250, bg=self.COLORS['sidebar'])
         side.pack(side='left', fill='y')
@@ -136,22 +165,29 @@ class Panel:
         self._text(side, 'MENU', 9, 'bold', self.COLORS['subtle']).pack(
             anchor='w', padx=19, pady=(14, 10))
         self.nav_buttons = {}
+        from PIL import ImageTk
+        from .brand import navigation_icon
+        self.nav_icons = {key: ImageTk.PhotoImage(navigation_icon(key)) for key in
+                          ('inicio', 'permissoes', 'ferramentas', 'atividade', 'assistente', 'minimizar')}
         for key, label in (
-            ('inicio', '⌂  Início'),
-            ('permissoes', '✓  Permissões'),
-            ('ferramentas', '▣  Ferramentas'),
-            ('atividade', '≡  Atividade'),
+            ('inicio', 'Início'),
+            ('permissoes', 'Permissões'),
+            ('ferramentas', 'Ferramentas'),
+            ('atividade', 'Atividade'),
         ):
             item = self._button(side, label, lambda selected=key: self.show_page(selected),
-                                tone='subtle', anchor='w')
+                                tone='subtle', anchor='w', image=self.nav_icons[key],
+                                compound='left')
             item.pack(fill='x', padx=12, pady=4)
             self.nav_buttons[key] = item
         tk.Frame(side, bg=self.COLORS['outline'], height=1).pack(
             fill='x', padx=18, pady=(17, 12))
-        self._button(side, '★  Assistente', self.open_setup, tone='subtle',
-                     anchor='w').pack(fill='x', padx=12, pady=4)
-        self._button(side, '↙  Minimizar', self.hide, tone='subtle',
-                     anchor='w').pack(fill='x', padx=12, pady=4)
+        self._button(side, 'Assistente', self.open_setup, tone='subtle',
+                     anchor='w', image=self.nav_icons['assistente'],
+                     compound='left').pack(fill='x', padx=12, pady=4)
+        self._button(side, 'Minimizar', self.hide, tone='subtle',
+                     anchor='w', image=self.nav_icons['minimizar'],
+                     compound='left').pack(fill='x', padx=12, pady=4)
 
         # Live status occupies the otherwise empty part of the navigation rail.
         state_card = tk.Frame(side, bg=self.COLORS['surface'], padx=15, pady=16,
@@ -170,11 +206,28 @@ class Panel:
             fill='x', pady=(5, 0))
         footer = tk.Frame(side, bg=self.COLORS['sidebar'])
         footer.pack(side='bottom', fill='x', padx=18, pady=15)
+        self._text(footer, 'IDIOMA', 8, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        language_picker = ttk.Combobox(footer, textvariable=self.selected_language_name,
+                                      values=list(LANGUAGES.values()), style='Navix.TCombobox',
+                                      state='readonly', width=19)
+        language_picker.pack(fill='x', pady=(5, 9))
+        language_picker.bind('<<ComboboxSelected>>', self.change_language)
         self._text(footer, 'CONTROLE SOB SUA AUTORIZAÇÃO', 8, 'bold',
                    self.COLORS['green']).pack(anchor='w')
-        self._text(footer, 'Nenhuma permissão permanente.\nVersão ' + __version__,
-                   9, color=self.COLORS['subtle'], justify='left').pack(
-            anchor='w', pady=(7, 0))
+        from PIL import ImageTk
+        from .brand import brazil_flag_frames
+        self.flag_images = [ImageTk.PhotoImage(frame) for frame in brazil_flag_frames()]
+        copyright_line = tk.Frame(footer, bg=self.COLORS['sidebar'])
+        copyright_line.pack(fill='x', pady=(7, 0))
+        self.flag_widget = tk.Label(copyright_line, image=self.flag_images[0],
+                                    bg=self.COLORS['sidebar'])
+        self.flag_widget.pack(side='left', padx=(0, 5))
+        self._text(copyright_line, 'ALFAMNA © 2026 — Todos os direitos reservados.',
+                   7, color=self.COLORS['subtle'], wraplength=155,
+                   justify='left').pack(side='left')
+        self._text(footer, 'Versão ' + __version__, 8,
+                   color=self.COLORS['subtle']).pack(anchor='w', pady=(4, 0))
+        self._start_flag_animation()
 
         main = tk.Frame(shell, bg=self.COLORS['base'], padx=24, pady=22)
         main.pack(side='left', fill='both', expand=True)
@@ -190,6 +243,65 @@ class Panel:
         self._tools_page(self.pages['ferramentas'])
         self._activity_page(self.pages['atividade'])
         self.show_page('inicio')
+
+    def _start_flag_animation(self):
+        if self._flag_timer:
+            self.root.after_cancel(self._flag_timer)
+            self._flag_timer = None
+        if os.environ.get('NAVIX_REDUCED_MOTION') == '1':
+            return
+        self._flag_index = 0
+        def next_frame():
+            if self.flag_widget.winfo_exists():
+                self._flag_index = (self._flag_index + 1) % len(self.flag_images)
+                self.flag_widget.configure(image=self.flag_images[self._flag_index])
+                self._flag_timer = self.root.after(480, next_frame)
+        self._flag_timer = self.root.after(480, next_frame)
+
+    def change_language(self, event=None):
+        desired = next((key for key, name in LANGUAGES.items()
+                        if name == self.selected_language_name.get()), 'pt-BR')
+        if desired == self.language:
+            return
+        old_log = self.output.get('1.0', 'end')
+        self.language = desired
+        save_language(self.directory, desired)
+        if self._flag_timer:
+            self.root.after_cancel(self._flag_timer)
+            self._flag_timer = None
+        self.shell.destroy()
+        self._build_ui()
+        self.root.title('NavixX Desktop ' + __version__)
+        self.output.insert('end', old_log)
+
+    def _tunnel_event(self, event, result):
+        self.session.audit(event, result)
+        self.diagnostics.record('tunnel', event, result,
+                                'error' if result == 'error' else 'info')
+        self.events.put(('tunnel_event', event, result))
+
+    def _launch_tunnel_worker(self):
+        if self._tunnel_worker_running:
+            return
+        self._tunnel_worker_running = True
+        def work():
+            try:
+                message = self.tunnel.connect()
+                self.events.put(('tunnel_message', message))
+            finally:
+                self.events.put(('tunnel_done',))
+        threading.Thread(target=work, daemon=True).start()
+
+    def connect_tunnel(self, tunnel_id, api_key, remember=False):
+        """User-initiated from wizard; credentials stay out of argv/log files."""
+        self.tunnel_settings.save(tunnel_id, api_key, remember=remember)
+        self.tunnel.configure(tunnel_id, api_key)
+        self._launch_tunnel_worker()
+
+    def disconnect_tunnel(self):
+        self.tunnel.stop()
+        self.tunnel_state.set('Túnel desligado')
+        self.show('Túnel remoto desconectado pelo proprietário.')
 
     def show_page(self, key):
         self.pages[key].tkraise()
@@ -287,8 +399,9 @@ class Panel:
         row = tk.Frame(page, bg=self.COLORS['base'])
         row.pack(fill='x', pady=(0, 15))
         self._text(row, 'Tempo de autorização:', 10, 'bold').pack(side='left', padx=(0, 10))
-        ttk.Combobox(row, textvariable=self.duration_minutes, values=(30, 60, 120, 240),
-                     style='Navix.TCombobox', state='readonly', width=7).pack(side='left')
+        ttk.Combobox(row, textvariable=self.duration_minutes,
+                     values=('30', '60', '120', '240', translate('Sem prazo', self.language)),
+                     style='Navix.TCombobox', state='readonly', width=12).pack(side='left')
         self._text(row, 'minutos', 10, color=self.COLORS['subtle']).pack(side='left', padx=10)
         actions = tk.Frame(page, bg=self.COLORS['base'])
         actions.pack(fill='x')
@@ -350,6 +463,31 @@ class Panel:
         self.output.pack(side='left', fill='both', expand=True)
         self._button(page, 'Limpar visualização', lambda: self.output.delete('1.0', 'end')
                      ).pack(anchor='e', pady=(12, 0))
+        row = tk.Frame(page, bg=self.COLORS['base'])
+        row.pack(anchor='w', pady=(7, 0))
+        self._button(row, 'Ver logs', self.open_logs).pack(side='left', padx=(0, 8))
+        self._button(row, 'Exportar diagnóstico', self.export_diagnostics).pack(side='left')
+
+    def open_logs(self):
+        self.diagnostics.record('gui', 'logs_open')
+        if self.diagnostics.path.exists() and sys.platform == 'win32':
+            os.startfile(str(self.diagnostics.path))
+        else:
+            self.show('Nenhum log disponível para abrir neste ambiente.')
+
+    def export_diagnostics(self):
+        destination = filedialog.asksaveasfilename(parent=self.root,
+                      title='Exportar diagnóstico sem dados sensíveis',
+                      defaultextension='.json',
+                      filetypes=[('JSON', '*.json')],
+                      initialfile='navix-diagnostico.json')
+        if not destination:
+            return
+        report = self.diagnostics.report(self.session, self.service, self.tunnel, self.browser)
+        Path(destination).write_text(json.dumps(report, indent=2, ensure_ascii=False),
+                                     encoding='utf-8')
+        self.diagnostics.record('gui', 'diagnostics_export')
+        self.show('Diagnóstico exportado sem chaves, tokens ou conteúdo privado.')
 
     def setup_tray(self):
         if sys.platform != 'win32':
@@ -397,20 +535,43 @@ class Panel:
         if self.files_allowed.get(): permissions.append('files')
         if self.commands_allowed.get(): permissions.append('commands')
         if not permissions:
-            messagebox.showinfo('Navix', 'Selecione pelo menos uma permissão.')
+            messagebox.showinfo('Navix', translate('Selecione pelo menos uma permissão.',
+                                                getattr(self, 'language', 'pt-BR')))
             return
         if set(permissions) == {'browser', 'desktop', 'files', 'commands'}:
-            if not messagebox.askyesno('Autorizar acesso completo',
-                    'Esta sessão permitirá controlar a tela, executar programas e alterar ou apagar '
-                    'arquivos como seu usuário Windows. Autorizar pelo tempo selecionado?'):
+            if not messagebox.askyesno(translate('Autorizar acesso completo', getattr(self, 'language', 'pt-BR')),
+                    translate('Esta sessão permitirá controlar a tela, executar programas e alterar ou apagar '
+                    'arquivos como seu usuário Windows. Autorizar pelo tempo selecionado?',
+                    getattr(self, 'language', 'pt-BR'))):
                 return
-        minutes = self.duration_minutes.get()
+        selection = self.duration_minutes.get()
+        minutes = None if selection in ('Sem prazo', 'No time limit', 'Sin límite') else int(selection)
+        if minutes is None:
+            if not messagebox.askyesno(translate('Sessão sem prazo', getattr(self, 'language', 'pt-BR')),
+                    translate('As permissões permanecerão ativas enquanto este programa estiver aberto. '
+                    'Não use em computador compartilhado ou sem supervisão. '
+                    'O botão PARAR ACESSO revoga imediatamente a sessão. Confirmar?',
+                    getattr(self, 'language', 'pt-BR'))):
+                return
         self.session.activate(permissions, minutes=minutes)
+        if hasattr(self, '_permission_preferences'):
+            self._permission_preferences.write_text(json.dumps(permissions), encoding='utf-8')
+        if hasattr(self, 'diagnostics'):
+            self.diagnostics.record('session', 'authorized', code='UNLIMITED' if minutes is None else 'TIMED')
         self.service.start()
-        self.show(f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
+        self.show('Sessão autorizada sem prazo neste processo.' if minutes is None else
+                  f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
+        if hasattr(self, 'tunnel_settings'):
+            tunnel_id = self.tunnel_settings.load()
+            key = self.tunnel_settings.load_key()
+            if tunnel_id and key:
+                self.tunnel.configure(tunnel_id, key)
+                self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
+        self.tunnel.stop()
         self.session.stop()
+        self.diagnostics.record('session', 'revoked')
         self.show('Acesso interrompido. Credencial anterior revogada.')
 
     def open_browser(self, kind):
@@ -469,6 +630,8 @@ class Panel:
         self.service.close()
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
         self.service.start()
+        if hasattr(self, 'tunnel'):
+            self.tunnel.service = self.service
         self.show('Servidor MCP reiniciado em nova porta local. Copie novamente o pareamento quando estiver pronto.')
         if self.session.status()['active']:
             self.show('Autorização preservada com o tempo restante original.')
@@ -479,6 +642,12 @@ class Panel:
         while not self.events.empty():
             event = self.events.get_nowait()
             if event is None: self.busy = False
+            elif isinstance(event, tuple) and event[0] == 'tunnel_event':
+                self.show(f'Túnel: {event[1]} ({event[2]})')
+            elif event == ('tunnel_done',):
+                self._tunnel_worker_running = False
+            elif isinstance(event, tuple) and event[0] == 'tunnel_message':
+                self.show(event[1])
             elif event == ('show',):
                 self.root.deiconify()
                 self.root.lift()
@@ -488,8 +657,20 @@ class Panel:
                 return
             else: self.show(event)
         status = self.session.status()
+        tunnel_state = self.tunnel.check()
+        self.tunnel_state.set(tunnel_state)
+        health = (bool(self.service.ready), status['active'], tunnel_state)
+        if health != self._last_health:
+            self.diagnostics.record('watchdog', 'health_change',
+                                    'ok' if health[0] else 'degraded',
+                                    'info' if health[0] else 'warning',
+                                    code='LOCAL_READY' if health[0] else 'LOCAL_NOT_READY')
+            self._last_health = health
+        if tunnel_state == 'reconectar' and not self._tunnel_worker_running:
+            self._launch_tunnel_worker()
         if status['active'] and self.service.ready:
-            self.state.set('LOCAL PRONTO — sessão autorizada: %ds' % status['remaining_seconds'])
+            self.state.set('LOCAL PRONTO — sessão sem prazo' if status.get('unlimited') else
+                           'LOCAL PRONTO — sessão autorizada: %ds' % status['remaining_seconds'])
         elif status['active']:
             self.state.set('SERVIDOR INDISPONÍVEL — clique em Diagnosticar')
         else:
@@ -508,15 +689,17 @@ class Panel:
         self.side_service.set('MCP: porta ' + str(self.service.port) if self.service.ready
                               else 'Servidor não iniciado')
         remaining = status['remaining_seconds'] if status['active'] else 0
-        self.side_duration.set('Restam %02d:%02d:%02d' %
+        self.side_duration.set('Sem prazo • até desconectar' if status.get('unlimited') else
+                               ('Restam %02d:%02d:%02d' %
                                (remaining // 3600, (remaining // 60) % 60, remaining % 60)
-                               if remaining else 'Sem sessão autorizada')
+                                if remaining else 'Sem sessão autorizada'))
         self.root.after(500, self.tick)
 
     def close(self):
         if self.tray:
             self.tray.stop()
         self.session.stop()
+        self.tunnel.stop()
         self.service.close()
         try:
             self.browser.close()

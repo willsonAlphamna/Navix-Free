@@ -4,6 +4,7 @@ The emblem is provided by the owner of the Circuito Vivo channel.
 No remote assets or user-specific credentials are bundled.
 """
 from pathlib import Path
+import math
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
@@ -94,9 +95,75 @@ def wizard_image(size=(480, 918)):
     return canvas.convert('RGB')
 
 
+def wizard_small_image(size=(256, 256)):
+    """Brand inset from the right trim line of the installer header."""
+    image = _gradient(size).convert('RGBA')
+    emblem = icon_image(174)
+    # Asymmetric spacing keeps the emblem visibly away from the right border.
+    image.alpha_composite(emblem, (25, (size[1] - emblem.height) // 2))
+    return image.convert('RGB')
+
+
+def navigation_icon(name, size=22):
+    """Coherent two-pixel line icons; no Unicode font/emojis required."""
+    factor = 3
+    s = size * factor
+    image = Image.new('RGBA', (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(image)
+    color = (130, 196, 246, 255)
+    accent = (63, 219, 230, 255)
+    line = max(3, 2 * factor)
+    if name == 'inicio':
+        d.line([(8, 31), (33, 9), (58, 31)], fill=color, width=line, joint='curve')
+        d.line([(16, 29), (16, 57), (50, 57), (50, 29)], fill=color, width=line)
+        d.rectangle((29, 42, 38, 57), outline=accent, width=3)
+    elif name == 'permissoes':
+        d.rounded_rectangle((15, 9, 51, 57), radius=11, outline=color, width=line)
+        d.line([(24, 32), (31, 39), (44, 25)], fill=accent, width=line, joint='curve')
+    elif name == 'ferramentas':
+        d.ellipse((12, 12, 40, 40), outline=color, width=line)
+        d.line([(37, 36), (56, 55)], fill=accent, width=line)
+        d.ellipse((8, 8, 15, 15), fill=accent)
+    elif name == 'atividade':
+        d.rounded_rectangle((10, 8, 55, 58), radius=8, outline=color, width=line)
+        for y in (24, 35, 46):
+            d.line([(23, y), (46, y)], fill=accent if y == 35 else color, width=4)
+    elif name == 'assistente':
+        d.ellipse((18, 18, 48, 48), outline=color, width=line)
+        d.line([(33, 8), (33, 18), (33, 48), (33, 58)], fill=accent, width=4)
+        d.line([(8, 33), (18, 33), (48, 33), (58, 33)], fill=accent, width=4)
+    elif name == 'minimizar':
+        d.rounded_rectangle((8, 11, 58, 55), radius=7, outline=color, width=line)
+        d.line([(22, 45), (44, 45)], fill=accent, width=line)
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+def brazil_flag_frames(size=(32, 20), count=4):
+    """Subtle 4-frame wave, tiny enough for older dual-core Windows PCs."""
+    width, height = size
+    frames = []
+    for index in range(count):
+        image = Image.new('RGBA', size, (0, 0, 0, 0))
+        d = ImageDraw.Draw(image)
+        for x in range(width):
+            sway = math.sin((x / width) * math.pi * 2 + index * math.pi / 2)
+            shift = round(sway * 1.1)
+            d.line((x, max(1, 1 + shift), x, min(height - 2, height - 2 + shift)),
+                   fill=(22, 143, 76, 255))
+        diamond = [(width//2, 3), (width-5, height//2),
+                   (width//2, height-4), (4, height//2)]
+        d.polygon(diamond, fill=(249, 210, 52, 255))
+        d.ellipse((width//2-5, height//2-5, width//2+5, height//2+5),
+                  fill=(25, 76, 166, 255))
+        d.arc((width//2-6, height//2-2, width//2+6, height//2+5),
+              180, 345, fill=(255, 255, 255, 240), width=1)
+        frames.append(image)
+    return frames
+
+
 if __name__ == '__main__':
     path = Path('assets')
     path.mkdir(exist_ok=True)
     icon_image().save(path / 'navix.ico', sizes=[(16, 16), (32, 32), (48, 48), (128, 128), (256, 256)])
     wizard_image().save(path / 'wizard.png')
-    icon_image(256).save(path / 'wizard-small.png')
+    wizard_small_image().save(path / 'wizard-small.png')

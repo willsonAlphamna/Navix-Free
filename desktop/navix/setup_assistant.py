@@ -1,29 +1,42 @@
-"""Guided public-distribution onboarding without bundled credentials.
-
-The assistant does not provision Platform organizations or bypass account consent.
-It only checks the local program, copies the short-lived pairing locally and opens
-official documentation/settings after a user's explicit click.
-"""
+"""One-time owner-guided setup; future runs reuse securely saved credentials."""
 import importlib.metadata
 import os
 from pathlib import Path
+import re
 import shutil
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import webbrowser
+from .tunnel_manager import bundled_tunnel_client
+from .i18n import translate
 
 TUNNEL_SETTINGS = 'https://platform.openai.com/settings/organization/tunnels'
 TUNNEL_GUIDE = 'https://developers.openai.com/api/docs/guides/secure-mcp-tunnels'
 
 
 def find_tunnel_client():
-    executable = shutil.which('tunnel-client')
+    executable = bundled_tunnel_client()
     if executable:
         return executable
     # Previous pilot installations used this per-user directory.
     base = Path(os.environ.get('LOCALAPPDATA', str(Path.home())))
     legacy = base / 'SuperConectorWilson' / 'TunnelClient' / 'extraido' / 'tunnel-client.exe'
     return str(legacy) if legacy.is_file() else None
+
+
+def existing_tunnel_id():
+    """Import only a non-secret ID from an existing local pilot profile."""
+    base = Path(os.environ.get('APPDATA', str(Path.home()))) / 'tunnel-client'
+    for name in ('navixx.yaml', 'playwright-opera.yaml'):
+        profile = base / name
+        try:
+            result = re.search(r'\btunnel_[0-9a-fA-F]{32}\b',
+                               profile.read_text(encoding='utf-8'))
+            if result:
+                return result.group(0)
+        except OSError:
+            pass
+    return ''
 
 
 def local_diagnostic(panel):
@@ -40,6 +53,7 @@ def local_diagnostic(panel):
         'permissions': status['permissions'],
         'port': panel.service.port,
         'tunnel_client_found': bool(find_tunnel_client()),
+        'tunnel_state': panel.tunnel.check() if hasattr(panel, 'tunnel') else 'desligado',
         'packages': packages,
     }
 
@@ -47,7 +61,7 @@ def local_diagnostic(panel):
 def open_assistant(panel):
     """Scrollable onboarding, including diagnostics, even at high Windows DPI."""
     dialog = tk.Toplevel(panel.root)
-    dialog.title('NavixX Desktop — Assistente de conexão')
+    dialog.title('NavixX Desktop — ' + translate('Assistente de conexão', panel.language))
     display_w, display_h = dialog.winfo_screenwidth(), dialog.winfo_screenheight()
     window_w = min(790, max(620, display_w - 80))
     window_h = min(720, max(510, display_h - 120))
@@ -101,23 +115,80 @@ def open_assistant(panel):
                     justify='left', wraplength=590).pack(anchor='w', pady=(10, 0))
         return inside
 
-    step(1, 'Autorize no Windows',
-         'No painel principal, abra Permissões, marque os recursos desejados e clique em '
-         'Conectar / Autorizar. O acesso nunca vem habilitado de fábrica.')
-    local = step(2, 'Pareie um cliente MCP local',
-                 'Quando o servidor estiver pronto, copie o pareamento somente para '
-                 'um cliente confiável. Nunca publique esse código ou envie por e-mail.')
-    panel._button(local, 'Copiar pareamento protegido', panel.copy_pairing,
-                  tone='primary').pack(anchor='w', pady=(12, 0))
-    remote = step(3, 'Acesso externo ao ChatGPT ou Codex',
-                  'O servidor local não abre acesso à internet. É necessária uma conexão '
-                  'autenticada própria para cada pessoa e computador.')
+    step(1, 'Autorize este computador',
+         'Na tela Permissões, selecione os recursos e clique em Conectar / Autorizar. '
+         'O acesso vem desligado de fábrica e pode ser revogado a qualquer momento.')
+    remote = step(2, 'Conecte com um clique — sem PowerShell',
+                  'Uma única vez, informe o ID do seu túnel e a chave restrita da sua '
+                  'conta OpenAI. O NavixX verifica a conexão, inicia o cliente de túnel '
+                  'incorporado e tenta reconectar quando há falhas temporárias.')
+    tunnel_id = tk.StringVar(value=panel.tunnel_settings.load() or existing_tunnel_id())
+    secret = tk.StringVar(value=panel.tunnel_settings.load_key())
+    remember = tk.BooleanVar(value=panel.tunnel_settings.secret.is_file())
+    panel._text(remote, 'ID do túnel (tunnel_…)', 10, 'bold').pack(anchor='w', pady=(10, 4))
+    id_entry = tk.Entry(remote, textvariable=tunnel_id, font=('Consolas', 10),
+                        bg='#243550', fg='white', insertbackground='white', relief='flat')
+    id_entry.pack(fill='x', ipady=8)
+    panel._text(remote, 'Chave da sua conta OpenAI (não aparece na tela)',
+                10, 'bold').pack(anchor='w', pady=(12, 4))
+    key_entry = tk.Entry(remote, textvariable=secret, show='*', font=('Consolas', 10),
+                         bg='#243550', fg='white', insertbackground='white', relief='flat')
+    key_entry.pack(fill='x', ipady=8)
+    tk.Checkbutton(remote, text=translate('Lembrar chave criptografada neste usuário Windows (DPAPI)',
+                                         panel.language),
+                   variable=remember, bg=panel.COLORS['surface'],
+                   fg=panel.COLORS['text'], selectcolor=panel.COLORS['sidebar'],
+                   activebackground=panel.COLORS['surface'],
+                   activeforeground=panel.COLORS['text']).pack(anchor='w', pady=(8, 0))
+
+    tunnel_feedback = tk.StringVar(value='Aguardando autorização e configuração.')
+    panel._text(remote, '', 10, color=panel.COLORS['cyan'],
+                textvariable=tunnel_feedback, anchor='w', justify='left',
+                wraplength=560).pack(fill='x', pady=(12, 8))
+    def connect_remote():
+        if not panel.session.status()['active'] or not panel.service.ready:
+            messagebox.showwarning('NavixX', 'Autorize uma sessão e aguarde MCP pronto primeiro.',
+                                   parent=dialog)
+            return
+        try:
+            panel.connect_tunnel(tunnel_id.get().strip(), secret.get().strip(), remember.get())
+        except (OSError, ValueError) as exc:
+            messagebox.showerror('Configuração do túnel', str(exc), parent=dialog)
+            return
+        secret.set('')
+        tunnel_feedback.set('Verificando segurança e iniciando o túnel em segundo plano…')
+
+    actions = tk.Frame(remote, bg=panel.COLORS['surface'])
+    actions.pack(fill='x', pady=(7, 0))
+    panel._button(actions, 'Conectar com ChatGPT', connect_remote,
+                  tone='primary').pack(side='left', padx=(0, 8))
+    panel._button(actions, 'Desconectar túnel', panel.disconnect_tunnel,
+                  tone='danger').pack(side='left')
+
+    def refresh_tunnel_label():
+        if dialog.winfo_exists():
+            tunnel_feedback.set('Estado do túnel: ' + panel.tunnel.check())
+            dialog.after(1800, refresh_tunnel_label)
+    dialog.after(2200, refresh_tunnel_label)
+
+    remote = step(3, 'Vincule no ChatGPT uma única vez',
+                  'Abra ChatGPT → Plugins → + → Adicionar servidor MCP personalizado → Tunnel. '
+                  'Escolha o mesmo ID. O ChatGPT precisa solicitar sua autorização; '
+                  'o NavixX não pode aceitar permissões por outra pessoa.')
     links = tk.Frame(remote, bg=panel.COLORS['surface'])
     links.pack(anchor='w', pady=(12, 0))
     panel._button(links, 'Configurações OpenAI', lambda: webbrowser.open(TUNNEL_SETTINGS)
                   ).pack(side='left', padx=(0, 8))
+    panel._button(links, 'Abrir ChatGPT', lambda: webbrowser.open('https://chatgpt.com')
+                  ).pack(side='left', padx=(0, 8))
     panel._button(links, 'Guia oficial', lambda: webbrowser.open(TUNNEL_GUIDE)
                   ).pack(side='left')
+
+    local = step(4, 'Pareamento local avançado (opcional)',
+                 'Para clientes MCP no mesmo computador, o botão abaixo copia a credencial '
+                 'de curta duração. A conexão automática acima não exige copiar esse código.')
+    panel._button(local, 'Copiar pareamento protegido', panel.copy_pairing).pack(
+        anchor='w', pady=(12, 0))
 
     diagnostic_edge, diagnostic = panel._card(page, pad=16)
     diagnostic_edge.pack(fill='x', pady=(14, 12))
@@ -134,8 +205,9 @@ def open_assistant(panel):
             f"Porta local: {data['port']}\n"
             f"Permissões: {', '.join(data['permissions']) or 'nenhuma'}\n"
             f"Cliente de túnel detectado: {'sim' if data['tunnel_client_found'] else 'não'}\n"
+            f"Túnel externo: {data['tunnel_state']}\n"
             f"Componentes incorporados:\n{packages}\n"
-            'Conexão externa: não confirmada por este diagnóstico.'
+            'O estado executando indica processo local vivo; valide uma chamada real no ChatGPT.'
         )
 
     panel._text(diagnostic, '', 10, color=panel.COLORS['text'],

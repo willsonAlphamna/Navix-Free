@@ -48,6 +48,26 @@ jobs:
           python -m PyInstaller --noconfirm --clean --console --onedir --name NavixPython --collect-all playwright --collect-all mcp --hidden-import pyautogui --hidden-import PIL.Image --hidden-import tkinter python_runner.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item dist\NavixPython dist\NavixDesktop\python-runtime -Recurse
+      - name: Incorporar tunnel-client oficial com SHA-256 verificado
+        shell: pwsh
+        run: |
+          $version = 'v0.0.18'
+          $archive = 'tunnel-client-v0.0.18-windows-amd64.zip'
+          $base = "https://github.com/openai/tunnel-client/releases/download/$version"
+          Invoke-WebRequest "$base/$archive" -OutFile $archive
+          Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile SHA256SUMS.txt
+          $line = Get-Content SHA256SUMS.txt | Where-Object { $_ -match [regex]::Escape($archive) } | Select-Object -First 1
+          if (!$line -or $line -notmatch '^([a-fA-F0-9]{64})\s+') { throw 'Hash oficial não encontrado' }
+          $expected = $Matches[1].ToLowerInvariant()
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw 'SHA-256 do tunnel-client diverge do release oficial' }
+          Expand-Archive $archive -DestinationPath tunnel-client-extracted
+          $binary = Get-ChildItem tunnel-client-extracted -Filter tunnel-client.exe -Recurse | Select-Object -First 1
+          if (!$binary) { throw 'Binário tunnel-client.exe ausente' }
+          Copy-Item $binary.FullName dist\NavixDesktop\tunnel-client.exe
+          Invoke-WebRequest 'https://raw.githubusercontent.com/openai/tunnel-client/v0.0.18/LICENSE' -OutFile dist\NavixDesktop\tunnel-client-LICENSE.txt
+          & dist\NavixDesktop\tunnel-client.exe help quickstart | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Cliente de túnel não executou no Windows' }
       - name: Verificar abertura do executável
         shell: pwsh
         run: |
@@ -73,10 +93,12 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.5.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.6.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client.exe")) { throw 'Cliente de túnel não foi incorporado ao instalador' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client-LICENSE.txt")) { throw 'Licença do cliente de túnel ausente' }
           $app = Start-Process $exe -PassThru
           Start-Sleep -Seconds 8
           if ($app.HasExited) { throw 'Aplicativo instalado não abriu' }
@@ -110,7 +132,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.5.exe
+          test -s release/NavixDesktop-Setup-0.2.6.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -119,8 +141,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.5 release/* \
+          gh release create navix-desktop-v0.2.6 release/* \
             --target "$GITHUB_SHA" \
-            --title "NAVIX Desktop 0.2.5 — Windows" \
-            --notes "NavixX Desktop 0.2.5: correção da descoberta OAuth inexistente no servidor MCP local, preservando autenticação Bearer nas ferramentas; melhorias visuais e assistente das versões anteriores. O instalador tem opção Abrir NAVIX Desktop agora na conclusão. Inclui instalador, lista de dependências, hash SHA-256 e relatório de autoteste. Cada usuário autoriza localmente as permissões. O acesso remoto ao ChatGPT exige configuração e autenticação próprias; não está ativado por padrão." \
+            --title "NAVIX Desktop 0.2.6 — Assistente de conexão" \
+            --notes "NavixX Desktop 0.2.6: assistente gráfico para configurar e iniciar o Secure MCP Tunnel sem PowerShell, cliente oficial incorporado com SHA-256 verificado, reconexão supervisionada e armazenamento opcional DPAPI. Idiomas PT-BR/EN/ES no instalador e troca no painel; ícones modernos, espaçamento do logo, ALFAMNA © 2026, logs exportáveis e opção de sessão sem prazo com confirmação explícita. A associação do túnel ao ChatGPT e a autorização dos usuários continuam exigindo consentimento individual. PRÉ-LANÇAMENTO: validar os fluxos novos em Windows real antes de distribuir amplamente." \
             --prerelease

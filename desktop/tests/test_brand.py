@@ -1,4 +1,5 @@
-from navix.brand import icon_image, wizard_image
+from navix.brand import (icon_image, wizard_image, wizard_small_image,
+                         navigation_icon, brazil_flag_frames)
 
 
 def test_navix_icon_has_alpha_and_scales():
@@ -24,3 +25,14 @@ def test_circuito_vivo_emblem_is_the_primary_icon():
     with Image.open(file) as source:
         expected = source.convert('RGBA').resize((256, 256), Image.Resampling.LANCZOS)
     assert icon_image(256).tobytes() == expected.tobytes()
+
+
+def test_installer_logo_has_right_margin_and_modern_nav_icons():
+    small = wizard_small_image()
+    assert small.size == (256, 256)
+    assert small.getpixel((253, 125)) == small.getpixel((240, 125))
+    for kind in ('inicio', 'permissoes', 'ferramentas', 'atividade', 'assistente', 'minimizar'):
+        picture = navigation_icon(kind)
+        assert picture.size == (22, 22)
+        assert picture.getbbox()
+    assert len(brazil_flag_frames()) == 4

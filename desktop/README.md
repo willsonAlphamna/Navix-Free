@@ -1,18 +1,17 @@
-# Navix Desktop 0.2.4 — piloto Windows
+# Navix Desktop 0.2.6 — conexão simplificada (pré-lançamento Windows)
 
-Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
+Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
 a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.4.exe` na sua conta Windows, sem administrador.
-2. Abra Navix Desktop, selecione as permissões (ou **Marcar todas**), escolha a duração e clique em **Conectar / Autorizar**. O acesso completo exige confirmação explícita.
-3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
-4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
-   Streamable HTTP e cabeçalho `Authorization: Bearer …`.
-5. Encerre com **PARAR ACESSO**. O token anterior perde validade; nova conexão exige
-   copiar o novo pareamento. A sessão expira após o tempo escolhido (30, 60, 120 ou 240 minutos).
+1. Instale `NavixDesktop-Setup-0.2.6.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
+2. Abra NavixX, selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
+3. Para acesso ChatGPT, abra **Assistente → Conectar com ChatGPT**, informe seu próprio ID de Secure MCP Tunnel e uma chave restrita OpenAI. O cliente de túnel já está no instalador: **não precisa de PowerShell**.
+4. Opcionalmente marque **Lembrar chave criptografada neste usuário Windows**. O app usa DPAPI e tenta ligar o túnel depois que você autorizar uma nova sessão.
+5. No ChatGPT, vincule o túnel em **Plugins → + → Adicionar servidor MCP personalizado → Tunnel** e aceite os avisos. Esse consentimento individual não pode ser automatizado.
+6. **PARAR ACESSO** revoga a sessão e interrompe o túnel. O acesso temporário dura 30, 60, 120 ou 240 minutos; **Sem prazo** é opcional, exige confirmação extra e só dura enquanto o programa estiver aberto.
 
 Não exige Python instalado na máquina de quem recebe o instalador. O Chromium é
 empacotado com o aplicativo. Os perfis de automação ficam separados do navegador habitual.
@@ -54,9 +53,7 @@ e o hash publicado. Não é necessário desligar o SmartScreen.
 ## Limites reais
 
 - O servidor escuta apenas `127.0.0.1`, numa porta livre selecionada automaticamente. Outra máquina não pode conectar diretamente.
-- O programa **não conecta esta conversa do ChatGPT automaticamente**. A integração
-  externa requer transporte seguro e autenticação compatíveis com o cliente escolhido.
-  OAuth e serviço de pareamento remoto para terceiros ainda não estão implementados.
+- O programa **inicia o túnel sem terminal** depois de você informar sua própria identidade e chave. Ele não pode criar contas OpenAI, aprovar termos ou vincular um plugin ChatGPT sem sua ação. OAuth e serviço público multiusuário ainda não estão implementados.
 - O token é individual, mas não é um sistema de contas nem um código público de convite.
   Nunca publique o conteúdo copiado. Desconectar revoga o token.
 - Automação de desktop controla a janela em foco. O proprietário deve acompanhar a sessão.
@@ -67,7 +64,7 @@ e o hash publicado. Não é necessário desligar o SmartScreen.
   comandos já concluídos não são revertidos. Fechar o painel encerra seu navegador de automação.
 - O Opera é detectado em caminhos comuns do Windows; outras instalações podem não ser
   reconhecidas. Usa perfil dedicado e porta loopback 9223, independentemente da 9222 antiga.
-- Não há atualização automática, assinatura Authenticode, serviço em segundo plano,
+- Não há atualização automática, assinatura Authenticode, serviço independente do painel,
   homologação no PC do usuário ou garantia de compatibilidade com todos os clientes MCP.
 - O instalador é piloto sem assinatura. Distribuição pública depende de homologação e
   estratégia de assinatura. Não desative as proteções do Windows.
@@ -153,11 +150,11 @@ Reparar conexão preserva a sessão ativa e seu prazo original. Não renova cred
 
 ## Instalação por outras pessoas e configuração guiada
 
-No painel, clique em **Assistente para novos usuários**. Ele mostra as três
-etapas: autorizar no próprio Windows, parear um cliente MCP local e consultar
-as opções oficiais para uma conexão externa autenticada. O botão de pareamento
-só copia a credencial quando a sessão local estiver ativa; não envia token
-à internet nem inclui nenhuma chave de API no instalador.
+No painel, clique em **Assistente**. O assistente configura e inicia o cliente
+Secure MCP Tunnel incorporado, sem PowerShell. ID e chave de cada pessoa são
+informados na primeira conexão e a chave só é persistida quando o usuário
+opta pela criptografia DPAPI vinculada ao login Windows. O pareamento manual
+local continua disponível como opção avançada; não há credenciais no instalador.
 
 O instalador é distribuível como programa Windows independente. Isso **não**
 significa que cada usuário terá ChatGPT remoto automaticamente: o usuário ou
@@ -197,3 +194,14 @@ importações do Python, navegação, arquivos, comandos, abertura da GUI e inst
 desinstalação. O botão **Diagnosticar** informa versões no PC de destino.
 Essa verificação **não comprova** que a conexão remota da conta ChatGPT ou o Opera
 real do usuário estejam pareados; esses testes exigem autenticação e execução local.
+
+## Versão 0.2.6 — mudanças e limitações
+
+- Cliente `tunnel-client` v0.0.18 oficial, incorporado no instalador após validar SHA-256 do release OpenAI.
+- Assistente gráfico para ID/chave restrita, diagnóstico, início do túnel e reconexão supervisionada. Não compartilhe o mesmo túnel ou a mesma chave com outras pessoas.
+- PT-BR, English e Español no instalador e principais elementos do painel, com seletor de idioma persistente. A revisão de mensagens técnicas e cobertura integral de traduções ainda precisa de homologação multilíngue.
+- Ícones próprios por imagem nos seis menus, margem do logotipo do instalador corrigida, rodapé ALFAMNA © 2026 e bandeira animada discreta. `NAVIX_REDUCED_MOTION=1` desativa a animação.
+- Botões **Ver logs** e **Exportar diagnóstico**: eventos locais estruturados, sem gravar senhas, chaves, conteúdo de páginas ou teclas.
+- **Sem prazo** é uma opção não padrão, válida somente durante o processo atual, revogável por PARAR ACESSO. Não se deve presumir proteção em tela bloqueada nem conexão garantida após reiniciar o Windows.
+
+É necessário validar o assistente no PC Windows de destino e em instalações limpas antes de ampla distribuição. Secure MCP Tunnel atende conexões **privadas**; um serviço público multiusuário exige infraestrutura HTTPS própria e autenticação de contas com consentimento e isolamento por dispositivo.
