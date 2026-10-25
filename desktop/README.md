@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.0 — piloto Windows
+# Navix Desktop 0.2.1 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,13 +6,13 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.0.exe` na sua conta Windows, sem administrador.
-2. Abra Navix Desktop, selecione as permissões e clique em **Conectar / Autorizar**.
+1. Instale `NavixDesktop-Setup-0.2.1.exe` na sua conta Windows, sem administrador.
+2. Abra Navix Desktop, selecione as permissões (ou **Marcar todas**), escolha a duração e clique em **Conectar / Autorizar**. O acesso completo exige confirmação explícita.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
    Streamable HTTP e cabeçalho `Authorization: Bearer …`.
 5. Encerre com **PARAR ACESSO**. O token anterior perde validade; nova conexão exige
-   copiar o novo pareamento. A sessão expira após 30 minutos.
+   copiar o novo pareamento. A sessão expira após o tempo escolhido (30, 60, 120 ou 240 minutos).
 
 Não exige Python instalado na máquina de quem recebe o instalador. O Chromium é
 empacotado com o aplicativo. Os perfis de automação ficam separados do navegador habitual.

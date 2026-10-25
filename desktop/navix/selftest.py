@@ -158,6 +158,29 @@ def run(report_path):
             assert executed['exit_code'] == 0 and 'NAVIX_DIRECT_EXEC_OK' in executed['stdout'], executed
             report['checks'].append('packaged_powershell_and_direct_command')
 
+            # Overwrite and recursive delete are tested only on disposable fixture paths.
+            replace_target = files_directory / 'overwrite.txt'
+            rpc('files_write', {'path': str(replace_target), 'text': 'ANTES'})
+            try:
+                rpc('files_write', {'path': str(replace_target), 'text': 'DEPOIS'})
+                raise AssertionError('Sobrescrita sem autorização foi aceita')
+            except RuntimeError:
+                pass
+            rpc('files_write', {'path': str(replace_target), 'text': 'DEPOIS', 'overwrite': True})
+            assert replace_target.read_text(encoding='utf-8') == 'DEPOIS'
+            nested = files_directory / 'pasta' / 'subpasta'
+            rpc('files_mkdir', {'path': str(nested)})
+            rpc('files_write', {'path': str(nested / 'arquivo.txt'), 'text': 'APAGAR_TESTE'})
+            try:
+                rpc('files_delete', {'path': str(nested.parent)})
+                raise AssertionError('Remoção recursiva implícita foi aceita')
+            except RuntimeError:
+                pass
+            rpc('files_delete', {'path': str(nested.parent), 'recursive': True})
+            assert not nested.parent.exists()
+            rpc('files_delete', {'path': str(replace_target)})
+            report['checks'].append('packaged_files_overwrite_and_recursive_delete')
+
             # Delete only files just created in our own fixture directory.
             for created in (source, moved, binary_path, browser_download, direct_download):
                 rpc('files_delete', {'path': str(created)})

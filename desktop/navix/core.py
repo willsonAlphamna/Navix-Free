@@ -17,8 +17,8 @@ class Session:
         self.permissions = set()
 
     def activate(self, permissions, minutes=30):
-        if not 1 <= minutes <= 60:
-            raise ValueError('A sessão deve durar de 1 a 60 minutos.')
+        if isinstance(minutes, bool) or not isinstance(minutes, int) or not 1 <= minutes <= 240:
+            raise ValueError('A sessão deve durar de 1 a 240 minutos.')
         if not set(permissions) <= {'browser', 'desktop', 'files', 'commands'}:
             raise ValueError('Permissão desconhecida.')
         with self.lock:

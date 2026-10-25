@@ -25,8 +25,8 @@ class Panel:
         self.busy = False
         self.tray = None
         self.root.title('Navix Desktop ' + __version__ + ' — Superconector')
-        self.root.geometry('800x740')
-        self.root.minsize(700, 700)
+        self.root.geometry('820x790')
+        self.root.minsize(700, 720)
         self.root.configure(bg='#111827')
         icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent)) / 'assets/navix.ico'
         if icon.is_file():
@@ -46,6 +46,7 @@ class Panel:
         self.desktop_allowed = tk.BooleanVar()
         self.files_allowed = tk.BooleanVar()
         self.commands_allowed = tk.BooleanVar()
+        self.duration_minutes = tk.IntVar(value=30)
         ttk.Checkbutton(frame, text='Permitir navegador de automação', variable=self.browser_allowed,
                         command=self.permissions_changed).pack(anchor='w', pady=4)
         ttk.Checkbutton(frame, text='Permitir mouse, teclado e captura da tela inteira', variable=self.desktop_allowed,
@@ -54,10 +55,15 @@ class Panel:
                         command=self.permissions_changed).pack(anchor='w', pady=4)
         ttk.Checkbutton(frame, text='Permitir executar PowerShell, Python e outros programas', variable=self.commands_allowed,
                         command=self.permissions_changed).pack(anchor='w', pady=4)
-        ttk.Label(frame, text='Sessão de 30 minutos. Desmarcar uma permissão interrompe a sessão.',
-                  wraplength=680).pack(anchor='w', pady=8)
+        ttk.Label(frame, text='Duração da autorização (minutos): 30, 60, 120 ou 240. Acesso restrito à conta Windows atual.',
+                  wraplength=680).pack(anchor='w', pady=(8, 2))
+        ttk.Combobox(frame, textvariable=self.duration_minutes, values=(30, 60, 120, 240),
+                     state='readonly', width=10).pack(anchor='w', pady=(0, 8))
+        ttk.Label(frame, text='Desmarcar uma permissão revoga a sessão. Acesso completo não supera a segurança do Windows.',
+                  wraplength=680).pack(anchor='w', pady=4)
         row = ttk.Frame(frame)
         row.pack(fill='x', pady=8)
+        ttk.Button(row, text='Marcar todas', command=self.select_all).pack(side='left', padx=(0,8))
         ttk.Button(row, text='Conectar / Autorizar', command=self.connect).pack(side='left', padx=(0,8))
         ttk.Button(row, text='PARAR ACESSO', command=self.stop).pack(side='left')
         row2 = ttk.Frame(frame)
@@ -110,6 +116,13 @@ class Panel:
         self.stop()
         self.show('Permissões alteradas. Autorize uma nova sessão para aplicar.')
 
+    def select_all(self):
+        for option in (self.browser_allowed, self.desktop_allowed,
+                       self.files_allowed, self.commands_allowed):
+            option.set(True)
+        self.permissions_changed()
+        self.show('Todas as permissões marcadas. Clique em Conectar / Autorizar para confirmar.')
+
     def connect(self):
         permissions = []
         if self.browser_allowed.get(): permissions.append('browser')
@@ -119,9 +132,15 @@ class Panel:
         if not permissions:
             messagebox.showinfo('Navix', 'Selecione pelo menos uma permissão.')
             return
+        if set(permissions) == {'browser', 'desktop', 'files', 'commands'}:
+            if not messagebox.askyesno('Autorizar acesso completo',
+                    'Esta sessão permitirá controlar a tela, executar programas e alterar ou apagar '
+                    'arquivos como seu usuário Windows. Autorizar pelo tempo selecionado?'):
+                return
+        minutes = self.duration_minutes.get()
+        self.session.activate(permissions, minutes=minutes)
         self.service.start()
-        self.session.activate(permissions)
-        self.show('Sessão autorizada por 30 minutos. Aguardando servidor MCP ficar pronto.')
+        self.show(f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
 
     def stop(self):
         self.session.stop()
