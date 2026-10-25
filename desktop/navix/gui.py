@@ -121,6 +121,10 @@ class Panel:
     def open_browser(self, kind):
         if self.busy:
             return
+        status = self.session.status()
+        if not status['active'] or 'browser' not in status['permissions']:
+            self.show('Navegador não autorizado. Marque a permissão de navegador e clique em Conectar / Autorizar.')
+            return
         self.busy = True
         def work():
             try:
@@ -154,13 +158,22 @@ class Panel:
         self.show('Logs: ' + str(self.session.directory / 'audit.jsonl'))
 
     def repair(self):
-        self.stop()
+        if self.service.ready:
+            self.show('Servidor MCP funcionando. A autorização e a credencial foram preservadas.')
+            if not self.session.status()['active']:
+                self.show('Sessão encerrada. Clique em Conectar / Autorizar para autorizar uma nova sessão.')
+            return
         if self.service.thread and self.service.thread.is_alive():
-            self.show('Servidor em execução; credencial renovada. Clique em Conectar para nova sessão.')
+            self.show('Servidor MCP ainda iniciando. Aguarde; a autorização foi preservada.')
             return
         self.service.close()
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
-        self.show('Serviço recriado. Clique em Conectar. Uma nova porta local livre foi selecionada.')
+        self.service.start()
+        self.show('Servidor MCP reiniciado em nova porta local. Copie novamente o pareamento quando estiver pronto.')
+        if self.session.status()['active']:
+            self.show('Autorização preservada com o tempo restante original.')
+        else:
+            self.show('Sessão encerrada. Clique em Conectar / Autorizar para autorizar uma nova sessão.')
 
     def tick(self):
         while not self.events.empty():
