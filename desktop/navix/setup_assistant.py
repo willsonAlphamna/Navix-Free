@@ -45,29 +45,60 @@ def local_diagnostic(panel):
 
 
 def open_assistant(panel):
-    """Accessible, themed onboarding. User consent remains in the main panel."""
+    """Scrollable onboarding, including diagnostics, even at high Windows DPI."""
     dialog = tk.Toplevel(panel.root)
-    dialog.title('NAVIX Desktop — Assistente de conexão')
-    dialog.geometry('770x710')
-    dialog.minsize(690, 660)
+    dialog.title('NavixX Desktop — Assistente de conexão')
+    display_w, display_h = dialog.winfo_screenwidth(), dialog.winfo_screenheight()
+    window_w = min(790, max(620, display_w - 80))
+    window_h = min(720, max(510, display_h - 120))
+    dialog.geometry(f'{window_w}x{window_h}')
+    dialog.minsize(min(620, window_w), min(510, window_h))
     dialog.configure(bg=panel.COLORS['base'])
     dialog.transient(panel.root)
-    page = tk.Frame(dialog, bg=panel.COLORS['base'], padx=28, pady=24)
-    page.pack(fill='both', expand=True)
-    panel._text(page, 'Vamos configurar seu NAVIX', 21, 'bold').pack(anchor='w')
-    panel._text(page, 'Três etapas claras para deixar o programa pronto no seu computador.',
-                10, color=panel.COLORS['subtle']).pack(anchor='w', pady=(6, 18))
+
+    shell = tk.Frame(dialog, bg=panel.COLORS['base'])
+    shell.pack(fill='both', expand=True)
+    content_canvas = tk.Canvas(shell, bg=panel.COLORS['base'],
+                               highlightthickness=0, bd=0)
+    scrollbar = ttk.Scrollbar(shell, orient='vertical', command=content_canvas.yview)
+    content_canvas.configure(yscrollcommand=scrollbar.set)
+    scrollbar.pack(side='right', fill='y')
+    content_canvas.pack(side='left', fill='both', expand=True)
+    page = tk.Frame(content_canvas, bg=panel.COLORS['base'], padx=22, pady=18)
+    viewport = content_canvas.create_window((0, 0), window=page, anchor='nw')
+
+    def sync_region(event=None):
+        content_canvas.configure(scrollregion=content_canvas.bbox('all'))
+
+    def sync_width(event):
+        content_canvas.itemconfigure(viewport, width=event.width)
+
+    page.bind('<Configure>', sync_region)
+    content_canvas.bind('<Configure>', sync_width)
+    def mouse_wheel(event):
+        delta = -1 if getattr(event, 'delta', 0) > 0 else 1
+        content_canvas.yview_scroll(delta, 'units')
+
+    dialog.bind('<MouseWheel>', mouse_wheel)
+    dialog.bind('<Button-4>', lambda event: content_canvas.yview_scroll(-1, 'units'))
+    dialog.bind('<Button-5>', lambda event: content_canvas.yview_scroll(1, 'units'))
+
+    panel._text(page, 'Assistente NavixX', 21, 'bold').pack(anchor='w')
+    panel._text(page, 'Configuração guiada e diagnóstico sem esconder informações.',
+                10, color=panel.COLORS['subtle'], wraplength=560,
+                justify='left').pack(anchor='w', pady=(6, 18))
 
     def step(number, title, detail):
         outer, inside = panel._card(page, pad=14)
-        outer.pack(fill='x', pady=5)
+        outer.pack(fill='x', pady=6)
         header = tk.Frame(inside, bg=panel.COLORS['surface'])
         header.pack(fill='x')
         panel._text(header, str(number).zfill(2), 12, 'bold',
                     panel.COLORS['cyan']).pack(side='left', padx=(0, 12))
-        panel._text(header, title, 12, 'bold').pack(side='left')
+        panel._text(header, title, 12, 'bold', wraplength=550,
+                    justify='left').pack(side='left')
         panel._text(inside, detail, 10, color=panel.COLORS['subtle'],
-                    justify='left', wraplength=635).pack(anchor='w', pady=(8, 0))
+                    justify='left', wraplength=590).pack(anchor='w', pady=(10, 0))
         return inside
 
     step(1, 'Autorize no Windows',
@@ -75,39 +106,47 @@ def open_assistant(panel):
          'Conectar / Autorizar. O acesso nunca vem habilitado de fábrica.')
     local = step(2, 'Pareie um cliente MCP local',
                  'Quando o servidor estiver pronto, copie o pareamento somente para '
-                 'um cliente confiável. Não publique esse código nem envie por e-mail.')
+                 'um cliente confiável. Nunca publique esse código ou envie por e-mail.')
     panel._button(local, 'Copiar pareamento protegido', panel.copy_pairing,
-                  tone='primary').pack(anchor='w', pady=(10, 0))
-    remote = step(3, 'Acesso externo ao ChatGPT/Codex',
-                  'O servidor local não abre acesso à internet. É necessário configurar '
-                  'conexão autenticada própria para cada pessoa e computador.')
+                  tone='primary').pack(anchor='w', pady=(12, 0))
+    remote = step(3, 'Acesso externo ao ChatGPT ou Codex',
+                  'O servidor local não abre acesso à internet. É necessária uma conexão '
+                  'autenticada própria para cada pessoa e computador.')
     links = tk.Frame(remote, bg=panel.COLORS['surface'])
-    links.pack(anchor='w', pady=(10, 0))
+    links.pack(anchor='w', pady=(12, 0))
     panel._button(links, 'Configurações OpenAI', lambda: webbrowser.open(TUNNEL_SETTINGS)
                   ).pack(side='left', padx=(0, 8))
     panel._button(links, 'Guia oficial', lambda: webbrowser.open(TUNNEL_GUIDE)
                   ).pack(side='left')
 
-    diagnostic_edge, diagnostic = panel._card(page, pad=15)
-    diagnostic_edge.pack(fill='both', expand=True, pady=(14, 8))
-    panel._text(diagnostic, 'DIAGNÓSTICO LOCAL', 10, 'bold', panel.COLORS['cyan']).pack(anchor='w')
+    diagnostic_edge, diagnostic = panel._card(page, pad=16)
+    diagnostic_edge.pack(fill='x', pady=(14, 12))
+    panel._text(diagnostic, 'DIAGNÓSTICO LOCAL', 11, 'bold',
+                panel.COLORS['cyan']).pack(anchor='w')
     summary = tk.StringVar()
 
     def refresh():
         data = local_diagnostic(panel)
-        ready = data['server_ready'] and data['session_active']
+        ready = bool(data['server_ready'] and data['session_active'])
+        packages = '\n'.join(f"  {key}: {value}" for key, value in data['packages'].items())
         summary.set(
-            f"Servidor MCP: {'PRONTO' if ready else 'PARADO / NÃO AUTORIZADO'}   |   "
-            f"Porta: {data['port']}\n"
+            f"Servidor MCP: {'PRONTO' if ready else 'PARADO / NÃO AUTORIZADO'}\n"
+            f"Porta local: {data['port']}\n"
             f"Permissões: {', '.join(data['permissions']) or 'nenhuma'}\n"
             f"Cliente de túnel detectado: {'sim' if data['tunnel_client_found'] else 'não'}\n"
+            f"Componentes incorporados:\n{packages}\n"
             'Conexão externa: não confirmada por este diagnóstico.'
         )
+
     panel._text(diagnostic, '', 10, color=panel.COLORS['text'],
-                textvariable=summary, justify='left', wraplength=635).pack(
-        anchor='w', pady=(10, 8))
-    buttons = tk.Frame(diagnostic, bg=panel.COLORS['surface'])
-    buttons.pack(anchor='w')
-    panel._button(buttons, 'Atualizar diagnóstico', refresh).pack(side='left', padx=(0, 8))
-    panel._button(buttons, 'Fechar', dialog.destroy).pack(side='left')
+                textvariable=summary, justify='left',
+                wraplength=520, anchor='w').pack(fill='x', pady=(12, 14))
+    panel._button(diagnostic, 'Atualizar diagnóstico', refresh).pack(anchor='w')
     refresh()
+
+    footer = tk.Frame(dialog, bg=panel.COLORS['sidebar'], padx=18, pady=10)
+    footer.pack(side='bottom', fill='x')
+    panel._text(footer, 'Role para conferir todas as etapas e versões.',
+                9, color=panel.COLORS['subtle']).pack(side='left')
+    panel._button(footer, 'Fechar assistente', dialog.destroy,
+                  tone='primary').pack(side='right')

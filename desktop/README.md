@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.3 — piloto Windows
+# Navix Desktop 0.2.4 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,7 +6,7 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.3.exe` na sua conta Windows, sem administrador.
+1. Instale `NavixDesktop-Setup-0.2.4.exe` na sua conta Windows, sem administrador.
 2. Abra Navix Desktop, selecione as permissões (ou **Marcar todas**), escolha a duração e clique em **Conectar / Autorizar**. O acesso completo exige confirmação explícita.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
@@ -30,14 +30,15 @@ nem um gerenciador pip; para pacotes adicionais use um interpretador instalado. 
 execução a partir dos fontes, usa o mesmo Python que iniciou o aplicativo.
 
 
-## Visual e instalação — versão 0.2.3
+## Visual e instalação — versão 0.2.4
 
 O painel Windows foi reorganizado em **Visão geral**, **Permissões**,
 **Ferramentas** e **Atividade**. Todas as ações do piloto anterior continuam
 acessíveis, inclusive autorização explícita e revogação de sessão. O novo
 ícone é uma interpretação própria de circuitos eletrônicos e da letra N.
-O logotipo original do canal Circuito Vivo não foi incorporado porque o
-arquivo-fonte exato ainda não foi confirmado.
+Na versão 0.2.4, a identidade visual usa o símbolo 3D do Circuito Vivo
+fornecido pelo próprio proprietário, isolado de uma captura de tela.
+O símbolo é incluído no instalador como imagem, no ícone da janela e na bandeja.
 
 O instalador tem visual NAVIX e uma opção **Abrir NAVIX Desktop agora** ao
 final. O navegador e o Windows controlam a barra de downloads e o diálogo
@@ -174,3 +175,25 @@ A configuração de uma infraestrutura pública e multiusuário é um trabalho
 separado, com autenticação por usuário, isolamento de dispositivos, consentimento
 granular, auditoria e hospedagem. Não se deve compartilhar tokens nem túneis
 entre instalações.
+
+## Ajustes visuais e verificação 0.2.4
+
+- Marca na interface: **NavixX**, com x minúsculo e X final maior.
+- Título de boas-vindas: vermelho escuro, palavra de ligação branca, marca azul.
+- Barra lateral: rótulos compactos, status local atualizado a cada meio segundo,
+  porta e prazo da sessão; sem indicação enganosa de conexão remota.
+- Assistente: conteúdo rolável com botões finais visíveis e versões detectadas.
+- Cartões e botões: bordas em camadas com contraste e leve relevo.
+- Emblema: `desktop/assets/circuitovivo_navix.png`, autorizado pelo proprietário
+  que enviou a referência do canal. As imagens de referência completas do celular
+  não são distribuídas no programa.
+
+### Componentes incorporados
+
+O instalador Windows inclui o executável Python integrado, Playwright, Chromium,
+PyAutoGUI, Pillow e servidor MCP. O destinatário não precisa instalar esses pacotes
+separadamente. O script de validação em CI testa o executável empacotado,
+importações do Python, navegação, arquivos, comandos, abertura da GUI e instalação/
+desinstalação. O botão **Diagnosticar** informa versões no PC de destino.
+Essa verificação **não comprova** que a conexão remota da conta ChatGPT ou o Opera
+real do usuário estejam pareados; esses testes exigem autenticação e execução local.

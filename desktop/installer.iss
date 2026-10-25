@@ -1,9 +1,9 @@
-#define AppVersion "0.2.3"
+#define AppVersion "0.2.4"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
-AppName=Navix Desktop
+AppName=NavixX Desktop
 AppVersion={#AppVersion}
-AppPublisher=Navix Desktop
+AppPublisher=NavixX
 DefaultDirName={localappdata}\Programs\NavixDesktop
 DefaultGroupName=Navix Desktop
 PrivilegesRequired=lowest
@@ -25,7 +25,7 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 [Files]
 Source: "dist\NavixDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
-Name: "{group}\Navix Desktop"; Filename: "{app}\NavixDesktop.exe"
-Name: "{autodesktop}\Navix Desktop"; Filename: "{app}\NavixDesktop.exe"
+Name: "{group}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"
+Name: "{autodesktop}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"
 [Run]
-Filename: "{app}\NavixDesktop.exe"; Description: "Abrir NAVIX Desktop agora"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\NavixDesktop.exe"; Description: "Abrir NavixX Desktop agora"; Flags: nowait postinstall skipifsilent

@@ -21,7 +21,7 @@ class Panel:
         'base': '#0b1120', 'sidebar': '#101b2e', 'surface': '#152238',
         'surface2': '#1b2c46', 'outline': '#273a56', 'text': '#f2f7ff',
         'subtle': '#9fb1c9', 'blue': '#2878f0', 'blue_hover': '#4092ff',
-        'cyan': '#60d6e7', 'green': '#58d5a1', 'red': '#ef6477',
+        'cyan': '#60d6e7', 'green': '#58d5a1', 'red': '#ef6477', 'blood': '#d42642', 'shadow': '#080f1c',
     }
 
     def __init__(self, root):
@@ -43,9 +43,15 @@ class Panel:
         self.port_details = tk.StringVar(value='Aguardando inicialização')
         self.permission_details = tk.StringVar(value='0 de 4 recursos autorizados')
         self.activity_text = tk.StringVar(value='Aguardando a primeira ação')
-        self.root.title('NAVIX Desktop ' + __version__ + ' • Central de Controle')
-        self.root.geometry('1060x760')
-        self.root.minsize(890, 650)
+        self.side_connection = tk.StringVar(value='● DESCONECTADO')
+        self.side_service = tk.StringVar(value='Servidor inativo')
+        self.side_duration = tk.StringVar(value='Sem sessão autorizada')
+        self.root.title('NavixX Desktop ' + __version__ + ' • Central de Controle')
+        available_w, available_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        window_w = min(1120, max(800, available_w - 80))
+        window_h = min(780, max(570, available_h - 90))
+        self.root.geometry(f'{window_w}x{window_h}')
+        self.root.minsize(min(800, window_w), min(570, window_h))
         self.root.configure(bg=self.COLORS['base'])
         icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent)) / 'assets/navix.ico'
         if icon.is_file():
@@ -78,17 +84,28 @@ class Panel:
         bg, fg, hover = palette[tone]
         button = tk.Button(parent, text=label, command=action, bg=bg, fg=fg,
                            activebackground=hover, activeforeground='#ffffff',
-                           cursor='hand2', relief='flat', bd=0,
+                           cursor='hand2', relief='raised', bd=1,
                            font=('Segoe UI', 10, 'bold'), padx=15, pady=11, **kwargs)
         button.bind('<Enter>', lambda event: button.configure(bg=hover))
         button.bind('<Leave>', lambda event: button.configure(bg=bg))
         return button
 
     def _card(self, parent, pad=18):
-        border = tk.Frame(parent, bg=self.COLORS['outline'], padx=1, pady=1)
-        inner = tk.Frame(border, bg=self.COLORS['surface'], padx=pad, pady=pad)
+        # Layered highlight and drop shadow provide depth without a heavy GUI toolkit.
+        shadow = tk.Frame(parent, bg=self.COLORS['shadow'], padx=1, pady=3)
+        edge = tk.Frame(shadow, bg='#3b5877', padx=1, pady=1)
+        edge.pack(fill='both', expand=True)
+        inner = tk.Frame(edge, bg=self.COLORS['surface'], padx=pad, pady=pad)
         inner.pack(fill='both', expand=True)
-        return border, inner
+        return shadow, inner
+
+    def _wordmark(self, parent, large=False):
+        row = tk.Frame(parent, bg=parent.cget('bg'))
+        basic = 24 if large else 16
+        self._text(row, 'Navi', basic, 'bold', '#3688ff').pack(side='left')
+        self._text(row, 'x', basic - 6, 'bold', '#6cd9ee').pack(side='left', pady=(6, 0))
+        self._text(row, 'X', basic + 4, 'bold', '#3688ff').pack(side='left')
+        return row
 
     def _section_title(self, parent, title, detail):
         self._text(parent, title, 23, 'bold').pack(anchor='w')
@@ -98,46 +115,66 @@ class Panel:
     def _build_ui(self):
         shell = tk.Frame(self.root, bg=self.COLORS['base'])
         shell.pack(fill='both', expand=True)
-        side = tk.Frame(shell, width=228, bg=self.COLORS['sidebar'])
+        side = tk.Frame(shell, width=250, bg=self.COLORS['sidebar'])
         side.pack(side='left', fill='y')
         side.pack_propagate(False)
-        brand = tk.Frame(side, bg=self.COLORS['sidebar'], padx=20, pady=24)
+        brand = tk.Frame(side, bg=self.COLORS['sidebar'], padx=16, pady=22)
         brand.pack(fill='x')
         try:
             from PIL import ImageTk
             from .brand import icon_image
-            self.brand_photo = ImageTk.PhotoImage(icon_image(58))
+            self.brand_photo = ImageTk.PhotoImage(icon_image(64))
             tk.Label(brand, image=self.brand_photo, bg=self.COLORS['sidebar']).pack(side='left')
         except Exception:
-            self._text(brand, 'N', 30, 'bold', self.COLORS['cyan']).pack(side='left')
+            self._text(brand, 'NX', 24, 'bold', self.COLORS['cyan']).pack(side='left')
         wordmark = tk.Frame(brand, bg=self.COLORS['sidebar'])
-        wordmark.pack(side='left', padx=(10, 0))
-        self._text(wordmark, 'NAVIX', 17, 'bold').pack(anchor='w')
+        wordmark.pack(side='left', padx=(8, 0))
+        self._wordmark(wordmark).pack(anchor='w')
         self._text(wordmark, 'DESKTOP', 9, 'bold', self.COLORS['cyan']).pack(anchor='w')
-        self._text(side, 'CENTRAL DE CONTROLE', 8, 'bold', self.COLORS['subtle']).pack(
-            anchor='w', padx=22, pady=(20, 12))
+        self._text(side, 'MENU', 9, 'bold', self.COLORS['subtle']).pack(
+            anchor='w', padx=19, pady=(14, 10))
         self.nav_buttons = {}
         for key, label in (
-            ('inicio', '⌂   Visão geral'),
-            ('permissoes', '✓   Permissões'),
-            ('ferramentas', '▣   Ferramentas'),
-            ('atividade', '≡   Atividade'),
+            ('inicio', '⌂  Início'),
+            ('permissoes', '✓  Permissões'),
+            ('ferramentas', '▣  Ferramentas'),
+            ('atividade', '≡  Atividade'),
         ):
             item = self._button(side, label, lambda selected=key: self.show_page(selected),
                                 tone='subtle', anchor='w')
             item.pack(fill='x', padx=12, pady=4)
             self.nav_buttons[key] = item
-        tk.Frame(side, bg=self.COLORS['outline'], height=1).pack(fill='x', padx=18, pady=(22, 12))
-        self._button(side, '★   Assistente de conexão', self.open_setup, tone='subtle',
+        tk.Frame(side, bg=self.COLORS['outline'], height=1).pack(
+            fill='x', padx=18, pady=(17, 12))
+        self._button(side, '★  Assistente', self.open_setup, tone='subtle',
                      anchor='w').pack(fill='x', padx=12, pady=4)
-        self._button(side, '↙   Minimizar', self.hide, tone='subtle',
+        self._button(side, '↙  Minimizar', self.hide, tone='subtle',
                      anchor='w').pack(fill='x', padx=12, pady=4)
+
+        # Live status occupies the otherwise empty part of the navigation rail.
+        state_card = tk.Frame(side, bg=self.COLORS['surface'], padx=15, pady=16,
+                              highlightbackground='#355575', highlightthickness=1,
+                              relief='raised', bd=1)
+        state_card.pack(fill='x', padx=14, pady=(30, 8))
+        self._text(state_card, 'SESSÃO LOCAL', 9, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self.side_status_label = self._text(
+            state_card, '', 11, 'bold', self.COLORS['red'],
+            textvariable=self.side_connection, anchor='w', justify='left')
+        self.side_status_label.pack(fill='x', pady=(13, 7))
+        self._text(state_card, '', 9, color=self.COLORS['subtle'],
+                   textvariable=self.side_service, anchor='w').pack(fill='x')
+        self._text(state_card, '', 9, color=self.COLORS['subtle'],
+                   textvariable=self.side_duration, anchor='w').pack(
+            fill='x', pady=(5, 0))
         footer = tk.Frame(side, bg=self.COLORS['sidebar'])
-        footer.pack(side='bottom', fill='x', padx=20, pady=22)
-        self._text(footer, '●  CONTROLE LOCAL', 9, 'bold', self.COLORS['green']).pack(anchor='w')
-        self._text(footer, 'As permissões são temporárias.\nVersão ' + __version__,
-                   9, color=self.COLORS['subtle'], justify='left').pack(anchor='w', pady=(8, 0))
-        main = tk.Frame(shell, bg=self.COLORS['base'], padx=28, pady=26)
+        footer.pack(side='bottom', fill='x', padx=18, pady=15)
+        self._text(footer, 'CONTROLE SOB SUA AUTORIZAÇÃO', 8, 'bold',
+                   self.COLORS['green']).pack(anchor='w')
+        self._text(footer, 'Nenhuma permissão permanente.\nVersão ' + __version__,
+                   9, color=self.COLORS['subtle'], justify='left').pack(
+            anchor='w', pady=(7, 0))
+
+        main = tk.Frame(shell, bg=self.COLORS['base'], padx=24, pady=22)
         main.pack(side='left', fill='both', expand=True)
         main.grid_rowconfigure(0, weight=1)
         main.grid_columnconfigure(0, weight=1)
@@ -160,13 +197,22 @@ class Panel:
                              fg=self.COLORS['text'] if active else self.COLORS['subtle'])
 
     def _home_page(self, page):
-        self._section_title(page, 'Bem-vindo ao NAVIX', 'Seu computador e suas automações em um único lugar.')
+        headline = tk.Frame(page, bg=self.COLORS['base'])
+        headline.pack(anchor='w', fill='x')
+        self._text(headline, 'Bem-vindo', 23, 'bold', self.COLORS['blood']).pack(side='left')
+        self._text(headline, ' ao ', 23, 'bold', '#ffffff').pack(side='left')
+        self._wordmark(headline, large=True).pack(side='left')
+        self._text(page, 'Seu computador e suas automações em um único lugar.',
+                   10, color=self.COLORS['subtle']).pack(anchor='w', pady=(7, 18))
         frame, card = self._card(page, pad=24)
         frame.pack(fill='x', pady=(0, 16))
         top = tk.Frame(card, bg=self.COLORS['surface'])
         top.pack(fill='x')
         self._text(top, 'STATUS DA CONEXÃO', 9, 'bold', self.COLORS['cyan']).pack(side='left')
         self._text(top, 'MCP LOCAL', 9, 'bold', self.COLORS['subtle']).pack(side='right')
+        self._text(card, 'Conexão protegida neste PC • uso remoto requer pareamento autenticado',
+                   9, color=self.COLORS['subtle'], wraplength=580,
+                   justify='left').pack(anchor='w', pady=(11, 0))
         self.status_label = self._text(card, '', 17, 'bold', self.COLORS['red'],
                                        textvariable=self.state, anchor='w',
                                        wraplength=610, justify='left')
@@ -178,7 +224,7 @@ class Panel:
                    justify='left').pack(fill='x')
         actions = tk.Frame(card, bg=self.COLORS['surface'])
         actions.pack(fill='x', pady=(20, 0))
-        self._button(actions, 'Conectar / Autorizar', lambda: self.show_page('permissoes'),
+        self._button(actions, 'Configurar acesso', lambda: self.show_page('permissoes'),
                      tone='primary').pack(side='left', padx=(0, 9))
         self._button(actions, 'PARAR ACESSO', self.stop, tone='danger').pack(side='left')
         cards = tk.Frame(page, bg=self.COLORS['base'])
@@ -450,8 +496,19 @@ class Panel:
                                 else 'Sessão inativa. Autorize novamente para conectar.')
         self.port_details.set('Porta local: ' + str(self.service.port) if self.service.ready else 'Serviço não iniciado')
         self.permission_details.set(str(len(status['permissions']) if status['active'] else 0) + ' de 4 recursos autorizados')
-        self.status_label.configure(fg=self.COLORS['green'] if status['active'] and self.service.ready
+        local_ready = bool(status['active'] and self.service.ready)
+        self.status_label.configure(fg=self.COLORS['green'] if local_ready
                                     else self.COLORS['red'])
+        self.side_connection.set('● CONECTADO LOCAL' if local_ready else
+                                 ('● INICIANDO' if status['active'] else '● DESCONECTADO'))
+        self.side_status_label.configure(fg=self.COLORS['green'] if local_ready
+                                         else (self.COLORS['cyan'] if status['active'] else self.COLORS['red']))
+        self.side_service.set('MCP: porta ' + str(self.service.port) if self.service.ready
+                              else 'Servidor não iniciado')
+        remaining = status['remaining_seconds'] if status['active'] else 0
+        self.side_duration.set('Restam %02d:%02d:%02d' %
+                               (remaining // 3600, (remaining // 60) % 60, remaining % 60)
+                               if remaining else 'Sem sessão autorizada')
         self.root.after(500, self.tick)
 
     def close(self):

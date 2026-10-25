@@ -1,7 +1,7 @@
 """NAVIX visual identity: circuit-inspired, vector-like graphics rendered by Pillow.
 
-No remote assets, third-party trademarks or user-specific credentials are bundled.
-The exact Circuito Vivo channel artwork was not available for reliable reuse.
+The emblem is provided by the owner of the Circuito Vivo channel.
+No remote assets or user-specific credentials are bundled.
 """
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -19,7 +19,12 @@ def _gradient(size):
 
 
 def icon_image(size=256):
-    """Transparent rounded-tile app mark with a circuit-styled N."""
+    """Use the owner's Circuito Vivo emblem for NAVIX, retaining a local fallback."""
+    emblem = Path(__file__).resolve().parent.parent / 'assets' / 'circuitovivo_navix.png'
+    if emblem.is_file():
+        with Image.open(emblem) as source:
+            return source.convert('RGBA').resize((size, size), Image.Resampling.LANCZOS)
+    # Fallback only for running the source without the bundled asset.
     scale = 2
     s = 256 * scale
     image = Image.new('RGBA', (s, s), (0, 0, 0, 0))

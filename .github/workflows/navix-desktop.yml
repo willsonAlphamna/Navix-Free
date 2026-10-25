@@ -73,7 +73,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.3.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.4.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -110,7 +110,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.3.exe
+          test -s release/NavixDesktop-Setup-0.2.4.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -119,8 +119,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.3 release/* \
+          gh release create navix-desktop-v0.2.4 release/* \
             --target "$GITHUB_SHA" \
-            --title "NAVIX Desktop 0.2.3 — Windows" \
-            --notes "NAVIX Desktop 0.2.3: interface profissional com navegação por áreas, novo ícone e assistente visual. O instalador tem opção Abrir NAVIX Desktop agora na conclusão. Inclui instalador, lista de dependências, hash SHA-256 e relatório de autoteste. Cada usuário autoriza localmente as permissões. O acesso remoto ao ChatGPT exige configuração e autenticação próprias; não está ativado por padrão." \
+            --title "NAVIX Desktop 0.2.4 — Windows" \
+            --notes "NavixX Desktop 0.2.4: emblema 3D do Circuito Vivo autorizado pelo proprietário, títulos responsivos, indicador lateral de sessão, assistente com rolagem e diagnósticos legíveis. O instalador tem opção Abrir NAVIX Desktop agora na conclusão. Inclui instalador, lista de dependências, hash SHA-256 e relatório de autoteste. Cada usuário autoriza localmente as permissões. O acesso remoto ao ChatGPT exige configuração e autenticação próprias; não está ativado por padrão." \
             --prerelease

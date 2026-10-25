@@ -14,3 +14,13 @@ def test_wizard_art_is_generated_without_network():
     assert image.size == (480, 918)
     assert image.mode == 'RGB'
     assert image.getpixel((10, 10)) != image.getpixel((10, 900))
+
+
+def test_circuito_vivo_emblem_is_the_primary_icon():
+    from pathlib import Path
+    from PIL import Image
+    file = Path(__file__).resolve().parents[1] / 'assets' / 'circuitovivo_navix.png'
+    assert file.is_file()
+    with Image.open(file) as source:
+        expected = source.convert('RGBA').resize((256, 256), Image.Resampling.LANCZOS)
+    assert icon_image(256).tobytes() == expected.tobytes()
