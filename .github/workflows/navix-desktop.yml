@@ -94,3 +94,33 @@ jobs:
         with:
           name: NavixDesktop-Diagnostico
           path: desktop/packaged-selftest.json
+
+  publish_windows:
+    name: Publicar instalador público (pré-lançamento)
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/navix-desktop-full-tools'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NavixDesktop-Windows-Piloto
+          path: release
+      - name: Conferir artefato antes da publicação
+        shell: bash
+        run: |
+          test -s release/NavixDesktop-Setup-0.2.2.exe
+          test -s release/SHA256.txt
+          test -s release/packaged-selftest.json
+      - name: Publicar pré-lançamento no GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          gh release create navix-desktop-v0.2.2 release/* \
+            --target "$GITHUB_SHA" \
+            --title "NAVIX Desktop 0.2.2 — Windows" \
+            --notes "Pré-lançamento público do NAVIX Desktop. Inclui instalador, lista de dependências, hash SHA-256 e relatório de autoteste. Cada usuário autoriza localmente as permissões. O acesso remoto ao ChatGPT exige configuração e autenticação próprias; não está ativado por padrão." \
+            --prerelease
