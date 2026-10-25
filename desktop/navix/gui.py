@@ -11,6 +11,7 @@ from .core import Session
 from .browser import Browser
 from .desktop import Desktop
 from .server import Service
+from . import __version__
 
 
 class Panel:
@@ -23,9 +24,9 @@ class Panel:
         self.events = queue.Queue()
         self.busy = False
         self.tray = None
-        self.root.title('Navix Desktop — Superconector')
-        self.root.geometry('760x640')
-        self.root.minsize(650, 580)
+        self.root.title('Navix Desktop ' + __version__ + ' — Superconector')
+        self.root.geometry('800x740')
+        self.root.minsize(700, 700)
         self.root.configure(bg='#111827')
         icon = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent)) / 'assets/navix.ico'
         if icon.is_file():
@@ -43,9 +44,15 @@ class Panel:
         ttk.Label(frame, textvariable=self.state, font=('Segoe UI', 12, 'bold'), wraplength=680).pack(anchor='w', pady=8)
         self.browser_allowed = tk.BooleanVar()
         self.desktop_allowed = tk.BooleanVar()
+        self.files_allowed = tk.BooleanVar()
+        self.commands_allowed = tk.BooleanVar()
         ttk.Checkbutton(frame, text='Permitir navegador de automação', variable=self.browser_allowed,
                         command=self.permissions_changed).pack(anchor='w', pady=4)
         ttk.Checkbutton(frame, text='Permitir mouse, teclado e captura da tela inteira', variable=self.desktop_allowed,
+                        command=self.permissions_changed).pack(anchor='w', pady=4)
+        ttk.Checkbutton(frame, text='Permitir ler, editar, copiar, apagar e transferir arquivos', variable=self.files_allowed,
+                        command=self.permissions_changed).pack(anchor='w', pady=4)
+        ttk.Checkbutton(frame, text='Permitir executar PowerShell, Python e outros programas', variable=self.commands_allowed,
                         command=self.permissions_changed).pack(anchor='w', pady=4)
         ttk.Label(frame, text='Sessão de 30 minutos. Desmarcar uma permissão interrompe a sessão.',
                   wraplength=680).pack(anchor='w', pady=8)
@@ -107,6 +114,8 @@ class Panel:
         permissions = []
         if self.browser_allowed.get(): permissions.append('browser')
         if self.desktop_allowed.get(): permissions.append('desktop')
+        if self.files_allowed.get(): permissions.append('files')
+        if self.commands_allowed.get(): permissions.append('commands')
         if not permissions:
             messagebox.showinfo('Navix', 'Selecione pelo menos uma permissão.')
             return
@@ -147,6 +156,7 @@ class Panel:
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
 
     def diagnose(self):
+        self.show('Navix Desktop ' + __version__)
         self.show('Porta local: ' + str(self.service.port))
         self.show('Servidor MCP: ' + ('pronto' if self.service.ready else 'parado ou iniciando'))
         self.show('Sessão: ' + json.dumps(self.session.status(), ensure_ascii=False))

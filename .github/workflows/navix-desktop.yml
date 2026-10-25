@@ -1,6 +1,9 @@
 name: Navix Desktop - Windows piloto
 on:
   push:
+    branches: [feature/navix-desktop-zero, codex/navix-desktop-full-tools]
+    paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
+  pull_request:
     branches: [feature/navix-desktop-zero]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
@@ -42,6 +45,9 @@ jobs:
           python -m pip freeze | Out-File -Encoding utf8 DEPENDENCIES.txt
           python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --icon assets/navix.ico --add-data "assets;assets" --hidden-import pystray._win32 --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --noconfirm --clean --console --onedir --name NavixPython --collect-all playwright --collect-all mcp --hidden-import pyautogui --hidden-import PIL.Image --hidden-import tkinter python_runner.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item dist\NavixPython dist\NavixDesktop\python-runtime -Recurse
       - name: Verificar abertura do executável
         shell: pwsh
         run: |
@@ -67,7 +73,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.1.1.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.0.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }

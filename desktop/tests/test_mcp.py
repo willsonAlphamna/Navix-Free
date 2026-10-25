@@ -52,8 +52,9 @@ def test_tools_discovered(api):
     response = rpc(client, session, 'tools/list')
     assert response.status_code == 200, response.text
     names = {tool['name'] for tool in response.json()['result']['tools']}
-    assert len(names) == 13
-    assert {'desktop_type', 'browser_fill', 'status'} <= names
+    assert {'desktop_type', 'browser_fill', 'status', 'desktop_hotkey',
+            'browser_upload', 'browser_download', 'files_read', 'files_delete',
+            'command_run', 'command_exec'} <= names
 
 
 def test_default_tool_denied(api):
@@ -67,6 +68,27 @@ def test_authorized_browser(api):
     session.activate(['browser'])
     response = rpc(client, session, 'tools/call', {'name': 'browser_tabs', 'arguments': {}})
     assert not response.json()['result'].get('isError')
+
+
+def test_file_permission_does_not_grant_commands(api, tmp_path):
+    session, client = api
+    session.activate(['files'])
+    path = str(tmp_path / 'authorized.txt')
+    response = rpc(client, session, 'tools/call', {'name': 'files_write',
+        'arguments': {'path': path, 'text': 'ok'}})
+    assert not response.json()['result'].get('isError')
+    response = rpc(client, session, 'tools/call', {'name': 'command_run',
+        'arguments': {'shell': 'python', 'command': 'print("not allowed")'}})
+    assert response.json()['result']['isError'] is True
+
+
+def test_browser_permission_does_not_grant_file_access(api, tmp_path):
+    session, client = api
+    session.activate(['browser'])
+    response = rpc(client, session, 'tools/call', {'name': 'files_write',
+        'arguments': {'path': str(tmp_path / 'denied.txt'), 'text': 'must not be created'}})
+    assert response.json()['result']['isError'] is True
+    assert not (tmp_path / 'denied.txt').exists()
 
 
 def test_revoke_existing_client(api):

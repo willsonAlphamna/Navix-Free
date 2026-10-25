@@ -28,10 +28,30 @@ def test_actual_mcp_client_initialize_and_call(tmp_path):
                         initialized = await client.initialize()
                         assert initialized.serverInfo.name == 'Navix Desktop'
                         tools = await client.list_tools()
-                        assert len(tools.tools) == 13
+                        names = {tool.name for tool in tools.tools}
+                        assert {'files_edit', 'command_run', 'browser_upload', 'desktop_move'} <= names
                         result = await client.call_tool('status', {})
                         assert not result.isError
                         assert 'false' in result.content[0].text.lower()
+                        # Exercise real file and subprocess backends through MCP,
+                        # not just tool discovery or a fake adapter.
+                        session.activate(['files', 'commands'])
+                        path = str(tmp_path / 'mcp-test.txt')
+                        created = await client.call_tool('files_write', {'path': path, 'text': 'ação'})
+                        assert not created.isError
+                        edited = await client.call_tool('files_edit', {'path': path,
+                            'old_text': 'ação', 'new_text': 'MCP_REAL_OK'})
+                        assert not edited.isError
+                        read_file = await client.call_tool('files_read', {'path': path})
+                        assert not read_file.isError
+                        assert 'MCP_REAL_OK' in read_file.content[0].text
+                        command = await client.call_tool('command_run', {
+                            'shell': 'python', 'command': 'print("COMMAND_MCP_REAL_OK")'})
+                        assert not command.isError
+                        assert 'COMMAND_MCP_REAL_OK' in command.content[0].text
+                        deleted = await client.call_tool('files_delete', {'path': path})
+                        assert not deleted.isError
+                        assert not (tmp_path / 'mcp-test.txt').exists()
         asyncio.run(check())
     finally:
         service.close()

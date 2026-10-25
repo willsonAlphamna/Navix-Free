@@ -73,3 +73,19 @@ def test_open_browser_does_not_grant_browser_permission(tmp_path):
     Panel.open_browser(ui, 'integrado')
     assert not ui.busy
     assert ui.session.status()['permissions'] == ['desktop']
+
+
+def test_connect_uses_explicit_file_and_command_choices(tmp_path):
+    ui, _, messages = panel(tmp_path)
+    class Flag:
+        def __init__(self, value): self.value = value
+        def get(self): return self.value
+    ui.browser_allowed = Flag(False)
+    ui.desktop_allowed = Flag(False)
+    ui.files_allowed = Flag(True)
+    ui.commands_allowed = Flag(True)
+    started = []
+    ui.service.start = lambda: started.append(True)
+    Panel.connect(ui)
+    assert started == [True]
+    assert ui.session.status()['permissions'] == ['commands', 'files']

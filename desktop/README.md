@@ -1,12 +1,12 @@
-# Navix Desktop 0.1.1 — piloto Windows
+# Navix Desktop 0.2.0 — piloto Windows
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
-a Opera e automação de desktop autorizada por sessão.
+a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.1.1.exe` na sua conta Windows, sem administrador.
+1. Instale `NavixDesktop-Setup-0.2.0.exe` na sua conta Windows, sem administrador.
 2. Abra Navix Desktop, selecione as permissões e clique em **Conectar / Autorizar**.
 3. Aguarde **LOCAL PRONTO**. Abra o navegador integrado ou o Opera pelo painel.
 4. Clique em **Copiar pareamento** e configure um cliente MCP local compatível com
@@ -18,6 +18,17 @@ Não exige Python instalado na máquina de quem recebe o instalador. O Chromium 
 empacotado com o aplicativo. Os perfis de automação ficam separados do navegador habitual.
 Não inicia com o Windows e não abre portas no roteador.
 
+O painel permite selecionar navegador, desktop, arquivos e comandos. A autorização vale
+para a sessão: não é necessário aprovar cada clique, leitura ou comando novamente.
+Upload e download pelo navegador exigem também a permissão de arquivos. Comandos
+executam com os privilégios da conta Windows que abriu o aplicativo.
+
+`command_run` aceita `powershell`, `cmd` e `python`. A distribuição inclui um executor
+`python-runtime/NavixPython.exe`, com suporte a código (`-c`), módulos (`-m`) e scripts,
+além de Playwright, PyAutoGUI, Pillow e MCP. Ele não é uma instalação geral de Python
+nem um gerenciador pip; para pacotes adicionais use um interpretador instalado. Na
+execução a partir dos fontes, usa o mesmo Python que iniciou o aplicativo.
+
 ## Limites reais
 
 - O servidor escuta apenas `127.0.0.1`, numa porta livre selecionada automaticamente. Outra máquina não pode conectar diretamente.
@@ -28,7 +39,10 @@ Não inicia com o Windows e não abre portas no roteador.
   Nunca publique o conteúdo copiado. Desconectar revoga o token.
 - Automação de desktop controla a janela em foco. O proprietário deve acompanhar a sessão.
   O botão Parar bloqueia novas ações e novos caracteres; uma ação de navegador já enviada
-  pode concluir antes da interrupção. Fechar o painel encerra seu navegador de automação.
+  pode concluir antes da interrupção. Movimento/arraste já iniciado pode levar até cinco
+  segundos para terminar. Comandos em execução são monitorados e sua árvore de processos
+  é encerrada após revogação ou timeout. Programas lançados de forma independente e
+  comandos já concluídos não são revertidos. Fechar o painel encerra seu navegador de automação.
 - O Opera é detectado em caminhos comuns do Windows; outras instalações podem não ser
   reconhecidas. Usa perfil dedicado e porta loopback 9223, independentemente da 9222 antiga.
 - Não há atualização automática, assinatura Authenticode, serviço em segundo plano,
@@ -43,6 +57,39 @@ Não inicia com o Windows e não abre portas no roteador.
 `status`, `browser_tabs`, `browser_open`, `browser_read`, `browser_click`, `browser_fill`,
 `browser_scroll`, `browser_screenshot`, `desktop_screenshot`, `desktop_click`,
 `desktop_type`, `desktop_key`, `desktop_scroll`.
+
+Novas ferramentas:
+
+- Navegador: `browser_start`, `browser_navigate`, `browser_close_tab`, `browser_back`,
+  `browser_forward`, `browser_reload`, `browser_snapshot`, `browser_select`,
+  `browser_press`, `browser_hover`, `browser_wait`, `browser_upload`, `browser_download`.
+- Desktop: `desktop_position`, `desktop_screen_info`, `desktop_move`, `desktop_drag`,
+  `desktop_hotkey`. `desktop_click` aceita botão e quantidade de cliques;
+  `desktop_key` reconhece as teclas do PyAutoGUI e `desktop_type` aceita até 10 mil caracteres.
+- Arquivos: `files_list`, `files_read`, `files_write`, `files_edit`, `files_mkdir`,
+  `files_copy`, `files_move`, `files_delete`, `files_read_binary`, `files_write_binary`,
+  `files_download`. Os caminhos pertencem ao computador Windows que executa o Navix.
+- Programas: `command_run` e `command_exec` (lista de argumentos, sem shell implícito).
+
+Gravação e transferências preservam arquivos existentes por padrão; quando suportada,
+a substituição exige `overwrite=true`. Exclusão é permanente; pastas não vazias exigem
+`recursive=true`. Edição textual exige correspondência exata e recusa trechos ambíguos.
+Movimentação é atômica dentro do mesmo volume. Entre volumes, a ferramenta recusa
+a operação e mantém a origem; use cópia, confira o resultado e só então apague a origem.
+Arquivos UTF-8 têm limite de 5 MB por chamada e binários Base64 de 10 MB. Para transferir
+um arquivo entre cliente e computador use `files_read_binary`/`files_write_binary`; o
+upload de uma página usa `browser_upload` no campo de arquivo do site.
+
+`browser_download` aguarda o início e término da transferência com timeout, confirma
+permissões e salva somente no destino explícito. Downloads utilizam eventos CDP do Chromium,
+inclusive quando conectado ao Opera; sua compatibilidade deve ser validada no Opera real.
+`files_download` permite baixar diretamente por HTTP/HTTPS com limite de tamanho,
+tempo e hash SHA-256. As credenciais da página continuam no perfil do navegador.
+
+Comandos têm timeout de 1 a 300 segundos, saída de até 1 MB por fluxo e retorno de
+`exit_code`, `stdout`, `stderr`, `timed_out` e `output_truncated`. Não confundir o retorno
+da ferramenta com sucesso do programa: verificar também o código de saída e a evidência
+da operação. Ajuste o timeout de leitura do cliente MCP para comandos mais longos.
 
 A navegação usa papel acessível e nome exato para evitar cliques ambíguos. Capturas são
 retornadas como imagens MCP, sem gravação automática. Logs registram somente horário,
@@ -64,6 +111,11 @@ O workflow `Navix Desktop - Windows piloto` instala o Chromium, testa, compila c
 PyInstaller, abre o executável, gera Inno Setup e testa instalar/desinstalar.
 Seu artefato fica no GitHub Actions, com SHA256 e versões resolvidas das dependências.
 Não confundir configuração do workflow com resultado aprovado.
+
+O autoteste do pacote executa ações em arquivos temporários, páginas locais e janela
+própria. A verificação local em Linux não comprova teclado/mouse nativos no Windows,
+instalação do executável, Opera nem integração remota com o ChatGPT. Esses resultados
+devem ser obtidos no runner Windows e no computador de destino antes da homologação.
 
 ## Fontes técnicas
 
