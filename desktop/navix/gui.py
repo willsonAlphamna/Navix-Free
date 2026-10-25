@@ -68,6 +68,8 @@ class Panel:
         self.setup_tray()
         self.root.protocol('WM_DELETE_WINDOW', self.close)
         self.root.after(500, self.tick)
+        # Check bundled package versions automatically without granting access.
+        self.root.after(1600, self.diagnose)
 
     def _text(self, parent, value, size=10, weight='normal', color=None, **kwargs):
         return tk.Label(parent, text=value, bg=parent.cget('bg'),
