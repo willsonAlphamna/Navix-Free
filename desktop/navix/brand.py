@@ -56,14 +56,66 @@ def icon_image(size=256):
 
 
 def _font(size, bold=False):
-    names = ('C:/Windows/Fonts/segoeuib.ttf', 'C:/Windows/Fonts/seguisb.ttf') if bold else (
-        'C:/Windows/Fonts/segoeui.ttf',)
+    names = ('C:/Windows/Fonts/segoeuib.ttf', 'C:/Windows/Fonts/seguisb.ttf',
+             'DejaVuSans-Bold.ttf') if bold else (
+        'C:/Windows/Fonts/segoeui.ttf', 'DejaVuSans.ttf')
     for name in names:
         try:
             return ImageFont.truetype(name, size)
         except OSError:
             pass
     return ImageFont.load_default()
+
+
+def wordmark_image(large=False):
+    """One continuous, embossed NavixX logotype; the x remains lowercase."""
+    width, height = (230, 60) if large else (147, 42)
+    font = _font(40 if large else 25, bold=True)
+    image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    mask = Image.new('L', (width, height), 0)
+    draw = ImageDraw.Draw(mask)
+    # Use a single text run, avoiding separate Tk labels and accidental gaps.
+    draw.text((4, 2), 'NavixX', font=font, fill=255,
+              stroke_width=0)
+    # Composite a shifted shadow without changing the original glyph mask.
+    shadow_mask = Image.new('L', (width, height), 0)
+    shadow_mask.paste(mask, (0, 3))
+    drop = Image.new('RGBA', (width, height), (2, 9, 25, 0))
+    drop.putalpha(shadow_mask.filter(ImageFilter.GaussianBlur(2)))
+    image.alpha_composite(drop)
+    fill = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    pixels = fill.load()
+    for y in range(height):
+        mix = y / max(1, height - 1)
+        for x in range(width):
+            pixels[x, y] = (int(116 - 69*mix), int(211 - 83*mix),
+                            int(255 - 7*mix), 255)
+    fill.putalpha(mask)
+    image.alpha_composite(fill)
+    shine_mask = Image.new('L', (width, height), 0)
+    shade = ImageDraw.Draw(shine_mask)
+    shade.rectangle((0, 0, width, height//2), fill=70)
+    import PIL.ImageChops
+    # Fine highlight around the upper half of the type.
+    highlight = Image.new('RGBA', (width, height), (215, 246, 255, 0))
+    highlight.putalpha(PIL.ImageChops.multiply(mask, shine_mask))
+    image.alpha_composite(highlight)
+    return image
+
+
+def raised_label_image(label, size=15):
+    """Compact embossed headings for the sidebar, rendered once per UI build."""
+    font = _font(size, bold=True)
+    sample = Image.new('RGBA', (300, 60), (0, 0, 0, 0))
+    bounds = ImageDraw.Draw(sample).textbbox((0, 0), label, font=font)
+    width, height = max(1, bounds[2] + 10), max(1, bounds[3] - bounds[1] + 12)
+    image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+    brush = ImageDraw.Draw(image)
+    y = 2 - bounds[1]
+    brush.text((4, y + 3), label, font=font, fill=(2, 8, 23, 230))
+    brush.text((3, y + 1), label, font=font, fill=(37, 91, 143, 255))
+    brush.text((3, y), label, font=font, fill=(211, 242, 255, 255))
+    return image
 
 
 def wizard_image(size=(480, 918)):
@@ -105,13 +157,19 @@ def wizard_small_image(size=(256, 256)):
 
 
 def navigation_icon(name, size=22):
-    """Coherent two-pixel line icons; no Unicode font/emojis required."""
+    """Glossy vector-like navigation tiles, legible at small Windows DPI."""
     factor = 3
     s = size * factor
     image = Image.new('RGBA', (s, s), (0, 0, 0, 0))
+    # Subtle 3D bezel, top specular highlight and cast shadow.
     d = ImageDraw.Draw(image)
-    color = (130, 196, 246, 255)
-    accent = (63, 219, 230, 255)
+    d.rounded_rectangle((4, 6, s-3, s-2), radius=17,
+                        fill=(2, 9, 24, 145))
+    d.rounded_rectangle((4, 2, s-4, s-7), radius=16,
+                        fill=(24, 58, 95, 240), outline=(70, 144, 207, 255), width=3)
+    d.arc((8, 4, s-8, s//2+11), 185, 350, fill=(138, 224, 252, 150), width=3)
+    color = (238, 249, 255, 255)
+    accent = (68, 225, 242, 255)
     line = max(3, 2 * factor)
     if name == 'inicio':
         d.line([(8, 31), (33, 9), (58, 31)], fill=color, width=line, joint='curve')

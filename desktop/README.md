@@ -1,4 +1,4 @@
-# Navix Desktop 0.2.7 — diagnóstico e reparo de túnel (pré-lançamento Windows)
+# NavixX Desktop 0.2.8 — login local e configuração guiada (pré-lançamento Windows)
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,12 +6,15 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.7.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
-2. Abra NavixX, selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
-3. Para acesso ChatGPT, abra **Assistente → Conectar com ChatGPT**, informe seu próprio ID de Secure MCP Tunnel e uma **chave Runtime OpenAI com permissão Tunnels Read + Use**. O cliente de túnel e o companion oficial estão no instalador: **não precisa de PowerShell**.
-4. Opcionalmente marque **Lembrar chave criptografada neste usuário Windows**. O app usa DPAPI e tenta ligar o túnel depois que você autorizar uma nova sessão.
-5. No ChatGPT, vincule o túnel em **Plugins → + → Adicionar servidor MCP personalizado → Tunnel** e aceite os avisos. Esse consentimento individual não pode ser automatizado.
-6. **PARAR ACESSO** revoga a sessão e interrompe o túnel. O acesso temporário dura 30, 60, 120 ou 240 minutos; **Sem prazo** é opcional, exige confirmação extra e só dura enquanto o programa estiver aberto.
+1. Instale `NavixDesktop-Setup-0.2.8.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
+2. Ao abrir, **crie uma senha local do NavixX** (mínimo 10 caracteres). Na próxima abertura, entre com essa senha. Este não é um login OpenAI ou conta sincronizada na nuvem.
+3. Selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
+4. Para acesso ChatGPT, abra **Assistente**. Siga os cartões ilustrados: entrar na Plataforma OpenAI, criar o túnel, gerar uma **chave Runtime OpenAI com Tunnels Read + Use** e colar o ID e a credencial. O programa oferece links diretos ao painel oficial. O cliente de túnel está incorporado: **não precisa de PowerShell**.
+5. Marque **Lembrar chave criptografada neste usuário Windows (DPAPI)**. Ela nunca aparece automaticamente no formulário. No **Meu cofre**, é possível consultá-la temporariamente após informar novamente a senha local; uma sessão remota ativa será encerrada antes de revelar a chave. Não compartilhe capturas de tela com segredos.
+6. No ChatGPT, vincule o túnel em **Plugins → + → Adicionar servidor MCP personalizado → Tunnel** e aceite os avisos. Esse consentimento individual não pode ser automatizado.
+7. **PARAR ACESSO** revoga a sessão e interrompe o túnel. **Bloquear painel** também encerra o acesso e exige novamente o login local. O acesso temporário dura 30, 60, 120 ou 240 minutos; **Sem prazo** é opcional, exige confirmação extra e só dura enquanto o programa estiver aberto.
+
+**Cuidado com senhas:** o login local protege o painel, mas **não é uma conta online e não elimina os riscos de malware ou de processos que já executam como o mesmo usuário Windows**. A senha local não é recuperável por e-mail. Se você a esquecer, precisará seguir um procedimento local de recuperação/reconfiguração; preserve as credenciais da OpenAI em um gerenciador de senhas confiável. A chave Runtime é distinta de uma chave de API genérica que não possui Tunnels Read + Use.
 
 Não exige Python instalado na máquina de quem recebe o instalador. O Chromium é
 empacotado com o aplicativo. Os perfis de automação ficam separados do navegador habitual.
@@ -51,6 +54,16 @@ Usuários devem baixar apenas do GitHub Releases oficial e conferir a origem
 e o hash publicado. Não é necessário desligar o SmartScreen.
 
 ## Limites reais
+
+### O que mudou na candidata 0.2.8
+
+- Login **local** com derivação PBKDF2-SHA256, salt exclusivo e bloqueio temporário após tentativas falhas; nenhum compartilhamento de senha ou cadastro na nuvem.
+- Nova ação **Bloquear painel** revoga o acesso remoto antes de exigir login novamente.
+- Assistente ilustrado com passos curtos e links oficiais para túnel e geração de chave Runtime. Credencial salva não é mais pré-carregada no campo da interface.
+- Cofre com chave criptografada pelo Windows (DPAPI); visualização por 12 segundos, com confirmação da senha local e revogação prévia da sessão remota.
+- Logotipo contínuo e em alto-relevo, título e menu com efeito de profundidade, ícones de navegação com gradiente e acabamento 3D.
+- **Ainda não é login público multiusuário**, nem dispensa a credencial/consentimento da OpenAI. O plano de arquitetura pública está em `ONE_CLICK_PUBLIC.md`.
+
 
 ### Correção 0.2.7
 

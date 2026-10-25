@@ -101,7 +101,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.7.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.8.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -142,7 +142,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.7.exe
+          test -s release/NavixDesktop-Setup-0.2.8.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -151,8 +151,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.7 release/* \
+          gh release create navix-desktop-v0.2.8 release/* \
             --target "$GITHUB_SHA" \
-            --title "NAVIX Desktop 0.2.7 — Reparo do túnel e diagnóstico" \
-            --notes "NavixX Desktop 0.2.7: corrige pacote oficial para incluir cloudflared.exe e manifesto, evita conflito com porta local 8080 usando porta de saúde dinâmica, limpa perfis de terminal antigos herdados, e classifica falhas do túnel sem registrar chaves nem tokens. Mantém wizard, DPAPI e idiomas da 0.2.6. PRÉ-LANÇAMENTO: instalação e autotestes em CI; requer nova validação real no PC do proprietário. Uso público simplificado ainda depende de backend gerenciado e consentimento." \
+            --title "NavixX Desktop 0.2.8 — Login local, cofre e guia ilustrado" \
+            --notes "NavixX Desktop 0.2.8: acrescenta login local com senha, bloqueio que revoga o acesso remoto, assistente ilustrado com links oficiais para criação de túnel e chave Runtime, cofre DPAPI com reautenticação e revelação temporária, logo e ícones 3D. Mantém os reparos do túnel 0.2.7, tradução PT-BR/EN/ES e proteção por permissões. PRÉ-LANÇAMENTO: exige validação real no PC do proprietário. Login de nuvem e instalação pública em um clique ainda dependem de infraestrutura e consentimento individual." \
             --prerelease

@@ -3,7 +3,7 @@
 Este documento registra o requisito do proprietário: **quem instala o NavixX não deve
 abrir PowerShell, criar perfis YAML, procurar portas locais nem copiar tokens Bearer**.
 
-## O que a versão 0.2.6 automatiza
+## O que o piloto atual automatiza
 
 - Empacota o `tunnel-client` oficial com SHA-256 verificado.
 - Pede ID de túnel e chave própria **uma vez** no assistente gráfico, valida com `doctor`
@@ -13,6 +13,22 @@ abrir PowerShell, criar perfis YAML, procurar portas locais nem copiar tokens Be
   encerra o cliente de túnel. Nenhuma chave do desenvolvedor é embutida.
 - A etapa de consentimento para instalar/vincular o plugin dentro do ChatGPT ainda
   precisa ser realizada pelo titular da conta. É imposição de segurança da plataforma.
+- A candidata **0.2.8** adiciona login **local**, trava do painel, cofre DPAPI com senha
+  para revelação de chave, ilustrações no assistente e links diretos à Plataforma.
+  Esse login **não** é autenticação de conta pública nem substitui OAuth.
+
+## Requisitos registrados para as próximas versões
+
+| Pedido do proprietário | Situação e aceitação |
+| --- | --- |
+| Instalar e conectar sem comandos | Instalador e cliente de túnel incorporados; a criação de identidade OpenAI ainda é manual. Aceitar somente com teste de conta nova sem PowerShell. |
+| Recuperação automática de falhas | Retry e watchdog locais existem; testar queda de internet, reinicialização do túnel e proteção contra loops. |
+| Downloads, arquivos e comandos | Ferramentas existem; em 25/10/2026 um download HTTPS para pasta temporária foi validado, lido e removido. Testar também download de navegador, conflitos e limites. |
+| Permissões, auditoria e proteção de credenciais | Permissões e logs redigidos existem. 0.2.8 introduz login local e cofre. Faltam auditoria independente, cenários multiusuário e atualização assinada. |
+| Produto público profissional | Idiomas PT-BR/EN/ES, telas e instalador existem. Faltam contas online, backend multiusuário, assinatura do EXE e homologação de PC limpo. |
+
+Nunca promover um recurso de **implementado** para **homologado** sem um teste real no
+Windows instalado, com registro de versão, caminho de teste e resultado observável.
 
 **Isso é uma melhoria para uso privado e pilotos, não uma solução pública definitiva.**
 O Secure MCP Tunnel é documentado para servidores privados/testes e não satisfaz os

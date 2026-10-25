@@ -1,5 +1,6 @@
 from navix.brand import (icon_image, wizard_image, wizard_small_image,
-                         navigation_icon, brazil_flag_frames)
+                         navigation_icon, brazil_flag_frames, wordmark_image,
+                         raised_label_image)
 
 
 def test_navix_icon_has_alpha_and_scales():
@@ -36,3 +37,12 @@ def test_installer_logo_has_right_margin_and_modern_nav_icons():
         assert picture.size == (22, 22)
         assert picture.getbbox()
     assert len(brazil_flag_frames()) == 4
+
+
+def test_embossed_brand_has_compact_lettering_and_visible_alpha():
+    for large, expected in ((False, (147, 42)), (True, (230, 60))):
+        picture = wordmark_image(large=large)
+        assert picture.size == expected
+        assert picture.mode == 'RGBA'
+        assert picture.getbbox()
+    assert raised_label_image('MENU').getbbox()

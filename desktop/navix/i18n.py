@@ -13,6 +13,7 @@ WORDS = {
     'Atividade': ('Activity', 'Actividad'),
     'Assistente': ('Assistant', 'Asistente'),
     'Minimizar': ('Minimize', 'Minimizar'),
+    'Bloquear painel': ('Lock panel', 'Bloquear panel'),
     'MENU': ('MENU', 'MENÚ'),
     'SESSÃO LOCAL': ('LOCAL SESSION', 'SESIÓN LOCAL'),
     '● DESCONECTADO': ('● DISCONNECTED', '● DESCONECTADO'),
@@ -128,6 +129,67 @@ WORDS = {
     'Lembrar chave criptografada neste usuário Windows (DPAPI)': (
         'Remember encrypted key for this Windows user (DPAPI)',
         'Recordar clave cifrada para este usuario Windows (DPAPI)'),
+    'Sua conta OpenAI: túnel e chave Runtime': (
+        'Your OpenAI account: tunnel and Runtime key',
+        'Tu cuenta OpenAI: túnel y clave Runtime'),
+    '① Entre na Plataforma OpenAI com sua conta.\n'
+    '② Na organização correta, abra Tunnels e crie um túnel para o NavixX. '
+    'A criação exige Tunnels Read + Manage. Copie o ID tunnel_…\n'
+    '③ Abra API Keys e crie uma chave Runtime restrita, com Tunnels Read + Use. '
+    'Dê um nome como “NavixX deste computador”.\n'
+    '④ Copie a chave uma vez, cole abaixo e marque o cofre criptografado. '
+    'Nunca envie a chave por e-mail, chat ou captura de tela.\n'
+    'Uma chave API comum sem permissão de túnel NÃO conecta o NavixX.': (
+        '① Sign in to OpenAI Platform.\n'
+        '② In the correct organization, open Tunnels and create a NavixX tunnel. '
+        'Creation requires Tunnels Read + Manage. Copy the tunnel_… ID.\n'
+        '③ Open API Keys and create a restricted Runtime key with Tunnels Read + Use. '
+        'Name it “NavixX on this PC”.\n'
+        '④ Copy the key once, paste below and enable the encrypted vault. '
+        'Never send the key in email, chat or screenshots.\n'
+        'A general API key without tunnel access WILL NOT connect NavixX.',
+        '① Inicia sesión en OpenAI Platform.\n'
+        '② En tu organización, abre Tunnels y crea el túnel NavixX. '
+        'Se necesita Tunnels Read + Manage. Copia el ID tunnel_…\n'
+        '③ Abre API Keys y crea una clave Runtime restringida con Tunnels Read + Use. '
+        'Nómbrala “NavixX de este equipo”.\n'
+        '④ Copia la clave una vez, pégala abajo y activa la bóveda cifrada. '
+        'Nunca la envíes por correo, chat ni capturas.\n'
+        'Una clave API general sin permisos del túnel NO conectará NavixX.'),
+    '1. Entrar na OpenAI': ('1. Open OpenAI', '1. Entrar en OpenAI'),
+    '2. Criar túnel': ('2. Create tunnel', '2. Crear túnel'),
+    '3. Chaves API': ('3. API keys', '3. Claves API'),
+    'Cole o ID de túnel e a chave Runtime criada na sua própria conta. '
+    'O NavixX verifica a conexão, inicia o cliente incorporado e tenta '
+    'reconectar quando houver falhas temporárias.': (
+        'Enter your own tunnel ID and Runtime key. NavixX verifies the connection, '
+        'starts its bundled client and retries temporary failures.',
+        'Introduce tu ID del túnel y clave Runtime. NavixX verifica la conexión, '
+        'inicia el cliente incorporado y reintenta los fallos temporales.'),
+    'Meu cofre • ver chave salva com senha': (
+        'My vault • reveal saved key with password',
+        'Mi bóveda • ver clave guardada con contraseña'),
+    'Chave armazenada:': ('Saved key:', 'Clave guardada:'),
+    'Sim, protegida pelo Windows': ('Yes, protected by Windows', 'Sí, protegida por Windows'),
+    'Não': ('No', 'No'),
+    ' • deixe o campo vazio para reutilizar a chave salva.': (
+        ' • leave blank to reuse saved key.',
+        ' • deja vacío para reutilizar la clave guardada.'),
+    'Criar login local': ('Create local login', 'Crear acceso local'),
+    'Entrar': ('Sign in', 'Entrar'),
+    'Proteção do painel deste usuário Windows': (
+        'Panel protection for this Windows user',
+        'Protección del panel de este usuario Windows'),
+    'Crie uma senha local': ('Create a local password', 'Crea una contraseña local'),
+    'Digite a senha local': ('Enter your local password', 'Introduce tu contraseña local'),
+    'Confirme a senha (mínimo 10 caracteres)': (
+        'Confirm password (at least 10 characters)',
+        'Confirma la contraseña (mínimo 10 caracteres)'),
+    'Login local, não é sua senha OpenAI.': (
+        'Local login, not your OpenAI password.',
+        'Acceso local, no es tu contraseña de OpenAI.'),
+    'Criar login e entrar': ('Create login and sign in', 'Crear acceso y entrar'),
+    'Entrar no NavixX': ('Sign in to NavixX', 'Entrar en NavixX'),
     'Vincule no ChatGPT uma única vez': (
         'Link in ChatGPT once', 'Vincula una sola vez en ChatGPT'),
     'Abra ChatGPT → Plugins → + → Adicionar servidor MCP personalizado → Tunnel. '

@@ -14,6 +14,7 @@ from .desktop import Desktop
 from .server import Service
 from .diagnostics import Diagnostics
 from .i18n import LANGUAGES, load_language, save_language, translate
+from .owner_auth import OwnerAccount
 from .tunnel_manager import TunnelManager, TunnelSettings
 from . import __version__
 
@@ -41,6 +42,9 @@ class Panel:
         self.language = load_language(directory, installer_lang)
         self.selected_language_name = tk.StringVar(value=LANGUAGES[self.language])
         self.session = Session(directory)
+        self.owner_account = OwnerAccount(directory)
+        self._authenticated = False
+        self._login_dialog = None
         self.diagnostics = Diagnostics(directory)
         self.browser = Browser(self.session)
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
@@ -98,6 +102,9 @@ class Panel:
         self.root.after(500, self.tick)
         # Check bundled package versions automatically without granting access.
         self.root.after(1600, self.diagnose)
+        # Native owner authentication is separate from OpenAI and MCP permissions.
+        self.root.withdraw()
+        self.root.after(20, self.require_owner_login)
 
     def _text(self, parent, value, size=10, weight='normal', color=None, **kwargs):
         return tk.Label(parent, text=translate(value, self.language), bg=parent.cget('bg'),
@@ -131,11 +138,98 @@ class Panel:
 
     def _wordmark(self, parent, large=False):
         row = tk.Frame(parent, bg=parent.cget('bg'))
-        basic = 24 if large else 16
-        self._text(row, 'Navi', basic, 'bold', '#3688ff').pack(side='left')
-        self._text(row, 'x', basic - 6, 'bold', '#6cd9ee').pack(side='left', pady=(6, 0))
-        self._text(row, 'X', basic + 4, 'bold', '#3688ff').pack(side='left')
+        try:
+            from PIL import ImageTk
+            from .brand import wordmark_image
+            photo = ImageTk.PhotoImage(wordmark_image(large=large))
+            if not hasattr(self, '_brand_words'):
+                self._brand_words = []
+            self._brand_words.append(photo)
+            tk.Label(row, image=photo, bg=row.cget('bg')).pack(side='left')
+        except Exception:
+            self._text(row, 'NavixX', 24 if large else 16,
+                       'bold', '#3688ff').pack(side='left')
         return row
+
+    def require_owner_login(self):
+        """Show a real local password gate; never start an MCP session here."""
+        if self._login_dialog and self._login_dialog.winfo_exists():
+            self._login_dialog.lift()
+            return
+        self.root.withdraw()
+        self._authenticated = False
+        create = not self.owner_account.exists
+        box = tk.Toplevel(self.root)
+        self._login_dialog = box
+        box.title('NavixX Desktop — ' + translate(
+                  'Criar login local' if create else 'Entrar', self.language))
+        box.geometry('450x355' if create else '450x300')
+        box.resizable(False, False)
+        box.configure(bg=self.COLORS['sidebar'])
+        box.protocol('WM_DELETE_WINDOW', self.close)
+        panel = tk.Frame(box, bg=self.COLORS['sidebar'], padx=28, pady=20)
+        panel.pack(fill='both', expand=True)
+        self._text(panel, 'NAVIX DESKTOP', 19, 'bold',
+                   self.COLORS['cyan']).pack(anchor='w')
+        self._text(panel, 'Proteção do painel deste usuário Windows', 10,
+                   color=self.COLORS['subtle']).pack(anchor='w', pady=(3, 14))
+        self._text(panel, 'Crie uma senha local' if create else 'Digite a senha local',
+                   11, 'bold').pack(anchor='w', pady=(0, 5))
+        password = tk.StringVar()
+        entry = tk.Entry(panel, textvariable=password, show='•',
+                         bg=self.COLORS['surface2'], fg='#ffffff',
+                         insertbackground='#ffffff', relief='flat',
+                         font=('Segoe UI', 12))
+        entry.pack(fill='x', ipady=7)
+        confirmation = tk.StringVar()
+        if create:
+            self._text(panel, 'Confirme a senha (mínimo 10 caracteres)', 10,
+                       color=self.COLORS['subtle']).pack(anchor='w', pady=(12, 5))
+            tk.Entry(panel, textvariable=confirmation, show='•',
+                     bg=self.COLORS['surface2'], fg='#ffffff',
+                     insertbackground='#ffffff', relief='flat',
+                     font=('Segoe UI', 12)).pack(fill='x', ipady=7)
+        feedback = tk.StringVar(value=translate(
+            'Login local, não é sua senha OpenAI.', self.language))
+        self._text(panel, '', 9, color=self.COLORS['cyan'],
+                   textvariable=feedback, wraplength=390).pack(anchor='w', pady=(14, 8))
+
+        def submit():
+            try:
+                if create:
+                    if password.get() != confirmation.get():
+                        raise ValueError('As duas senhas não coincidem.')
+                    self.owner_account.enroll(password.get())
+                elif not self.owner_account.verify(password.get()):
+                    wait = self.owner_account.seconds_until_retry()
+                    raise ValueError('Senha incorreta.' +
+                                     (f' Aguarde {wait}s para tentar de novo.' if wait else ''))
+            except (ValueError, OSError) as error:
+                feedback.set(str(error))
+                password.set('')
+                confirmation.set('')
+                return
+            password.set('')
+            confirmation.set('')
+            self._authenticated = True
+            box.grab_release()
+            box.destroy()
+            self._login_dialog = None
+            self.root.deiconify()
+            self.root.lift()
+            self.diagnostics.record('owner', 'login_success')
+
+        self._button(panel, 'Criar login e entrar' if create else 'Entrar no NavixX',
+                     submit, tone='primary').pack(fill='x', pady=(7, 0))
+        entry.bind('<Return>', lambda event: submit())
+        box.grab_set()
+        entry.focus_set()
+
+    def lock_panel(self):
+        """Lock always revokes remote control, including unlimited sessions."""
+        self.stop()
+        self.diagnostics.record('owner', 'panel_locked')
+        self.require_owner_login()
 
     def _section_title(self, parent, title, detail):
         self._text(parent, title, 23, 'bold').pack(anchor='w')
@@ -161,13 +255,17 @@ class Panel:
         wordmark = tk.Frame(brand, bg=self.COLORS['sidebar'])
         wordmark.pack(side='left', padx=(8, 0))
         self._wordmark(wordmark).pack(anchor='w')
-        self._text(wordmark, 'DESKTOP', 9, 'bold', self.COLORS['cyan']).pack(anchor='w')
-        self._text(side, 'MENU', 9, 'bold', self.COLORS['subtle']).pack(
+        from .brand import raised_label_image
+        self.desktop_word = ImageTk.PhotoImage(raised_label_image('DESKTOP', 12))
+        tk.Label(wordmark, image=self.desktop_word,
+                 bg=self.COLORS['sidebar']).pack(anchor='w')
+        self.menu_word = ImageTk.PhotoImage(raised_label_image('MENU', 13))
+        tk.Label(side, image=self.menu_word, bg=self.COLORS['sidebar']).pack(
             anchor='w', padx=19, pady=(14, 10))
         self.nav_buttons = {}
         from PIL import ImageTk
         from .brand import navigation_icon
-        self.nav_icons = {key: ImageTk.PhotoImage(navigation_icon(key)) for key in
+        self.nav_icons = {key: ImageTk.PhotoImage(navigation_icon(key, size=26)) for key in
                           ('inicio', 'permissoes', 'ferramentas', 'atividade', 'assistente', 'minimizar')}
         for key, label in (
             ('inicio', 'Início'),
@@ -188,6 +286,8 @@ class Panel:
         self._button(side, 'Minimizar', self.hide, tone='subtle',
                      anchor='w', image=self.nav_icons['minimizar'],
                      compound='left').pack(fill='x', padx=12, pady=4)
+        self._button(side, 'Bloquear painel', self.lock_panel, tone='subtle',
+                     anchor='w').pack(fill='x', padx=12, pady=4)
 
         # Live status occupies the otherwise empty part of the navigation rail.
         state_card = tk.Frame(side, bg=self.COLORS['surface'], padx=15, pady=16,
@@ -269,6 +369,7 @@ class Panel:
         if self._flag_timer:
             self.root.after_cancel(self._flag_timer)
             self._flag_timer = None
+        self._brand_words = []
         self.shell.destroy()
         self._build_ui()
         self.root.title('NavixX Desktop ' + __version__)
@@ -651,8 +752,11 @@ class Panel:
             elif isinstance(event, tuple) and event[0] == 'tunnel_message':
                 self.show(event[1])
             elif event == ('show',):
-                self.root.deiconify()
-                self.root.lift()
+                if self._authenticated:
+                    self.root.deiconify()
+                    self.root.lift()
+                else:
+                    self.require_owner_login()
             elif event == ('stop',): self.stop()
             elif event == ('exit',):
                 self.close()

@@ -5,13 +5,14 @@ from pathlib import Path
 import re
 import shutil
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import webbrowser
 from .tunnel_manager import bundled_tunnel_client
 from .i18n import translate
 
 TUNNEL_SETTINGS = 'https://platform.openai.com/settings/organization/tunnels'
 TUNNEL_GUIDE = 'https://developers.openai.com/api/docs/guides/secure-mcp-tunnels'
+API_KEYS = 'https://platform.openai.com/api-keys'
 
 
 def find_tunnel_client():
@@ -102,13 +103,22 @@ def open_assistant(panel):
                 10, color=panel.COLORS['subtle'], wraplength=560,
                 justify='left').pack(anchor='w', pady=(6, 18))
 
+    # The illustrations are part of the installed app, with no external images.
+    from PIL import ImageTk
+    from .brand import navigation_icon
+    artwork = []
+    dialog._navix_artwork = artwork
+    step_icons = {1: 'permissoes', 2: 'inicio', 3: 'assistente',
+                  4: 'ferramentas', 5: 'atividade'}
+
     def step(number, title, detail):
         outer, inside = panel._card(page, pad=14)
         outer.pack(fill='x', pady=6)
         header = tk.Frame(inside, bg=panel.COLORS['surface'])
         header.pack(fill='x')
-        panel._text(header, str(number).zfill(2), 12, 'bold',
-                    panel.COLORS['cyan']).pack(side='left', padx=(0, 12))
+        artwork.append(ImageTk.PhotoImage(navigation_icon(step_icons[number], size=40)))
+        tk.Label(header, image=artwork[-1], bg=panel.COLORS['surface']).pack(
+            side='left', padx=(0, 12))
         panel._text(header, title, 12, 'bold', wraplength=550,
                     justify='left').pack(side='left')
         panel._text(inside, detail, 10, color=panel.COLORS['subtle'],
@@ -118,12 +128,31 @@ def open_assistant(panel):
     step(1, 'Autorize este computador',
          'Na tela Permissões, selecione os recursos e clique em Conectar / Autorizar. '
          'O acesso vem desligado de fábrica e pode ser revogado a qualquer momento.')
-    remote = step(2, 'Conecte com um clique — sem PowerShell',
-                  'Uma única vez, informe o ID do seu túnel e a chave restrita da sua '
-                  'conta OpenAI. O NavixX verifica a conexão, inicia o cliente de túnel '
-                  'incorporado e tenta reconectar quando há falhas temporárias.')
+    guide = step(2, 'Sua conta OpenAI: túnel e chave Runtime',
+                 '① Entre na Plataforma OpenAI com sua conta.\n'
+                 '② Na organização correta, abra Tunnels e crie um túnel para o NavixX. '
+                 'A criação exige Tunnels Read + Manage. Copie o ID tunnel_…\n'
+                 '③ Abra API Keys e crie uma chave Runtime restrita, com Tunnels Read + Use. '
+                 'Dê um nome como “NavixX deste computador”.\n'
+                 '④ Copie a chave uma vez, cole abaixo e marque o cofre criptografado. '
+                 'Nunca envie a chave por e-mail, chat ou captura de tela.\n'
+                 'Uma chave API comum sem permissão de túnel NÃO conecta o NavixX.')
+    guide_links = tk.Frame(guide, bg=panel.COLORS['surface'])
+    guide_links.pack(fill='x', pady=(12, 0))
+    panel._button(guide_links, '1. Entrar na OpenAI',
+                  lambda: webbrowser.open('https://platform.openai.com/')).pack(side='left', padx=(0, 7))
+    panel._button(guide_links, '2. Criar túnel',
+                  lambda: webbrowser.open(TUNNEL_SETTINGS)).pack(side='left', padx=(0, 7))
+    panel._button(guide_links, '3. Chaves API',
+                  lambda: webbrowser.open(API_KEYS)).pack(side='left')
+
+    remote = step(3, 'Conecte com um clique — sem PowerShell',
+                  'Cole o ID de túnel e a chave Runtime criada na sua própria conta. '
+                  'O NavixX verifica a conexão, inicia o cliente incorporado e tenta '
+                  'reconectar quando houver falhas temporárias.')
     tunnel_id = tk.StringVar(value=panel.tunnel_settings.load() or existing_tunnel_id())
-    secret = tk.StringVar(value=panel.tunnel_settings.load_key())
+    # Never decrypt a saved key merely because someone opens this window.
+    secret = tk.StringVar(value='')
     remember = tk.BooleanVar(value=panel.tunnel_settings.secret.is_file())
     panel._text(remote, 'ID do túnel (tunnel_…)', 10, 'bold').pack(anchor='w', pady=(10, 4))
     id_entry = tk.Entry(remote, textvariable=tunnel_id, font=('Consolas', 10),
@@ -134,6 +163,12 @@ def open_assistant(panel):
     key_entry = tk.Entry(remote, textvariable=secret, show='*', font=('Consolas', 10),
                          bg='#243550', fg='white', insertbackground='white', relief='flat')
     key_entry.pack(fill='x', ipady=8)
+    already_saved = translate('Sim, protegida pelo Windows' if remember.get() else 'Não',
+                              panel.language)
+    panel._text(remote, translate('Chave armazenada:', panel.language) + ' ' + already_saved +
+                translate(' • deixe o campo vazio para reutilizar a chave salva.', panel.language),
+                9, color=panel.COLORS['subtle'], wraplength=570,
+                justify='left').pack(anchor='w', pady=(6, 0))
     tk.Checkbutton(remote, text=translate('Lembrar chave criptografada neste usuário Windows (DPAPI)',
                                          panel.language),
                    variable=remember, bg=panel.COLORS['surface'],
@@ -151,12 +186,72 @@ def open_assistant(panel):
                                    parent=dialog)
             return
         try:
-            panel.connect_tunnel(tunnel_id.get().strip(), secret.get().strip(), remember.get())
+            chosen_key = secret.get().strip()
+            if not chosen_key and remember.get():
+                chosen_key = panel.tunnel_settings.load_key()
+            if not chosen_key:
+                raise ValueError('Cole a chave Runtime ou use uma chave já salva no cofre.')
+            panel.connect_tunnel(tunnel_id.get().strip(), chosen_key, remember.get())
         except (OSError, ValueError) as exc:
             messagebox.showerror('Configuração do túnel', str(exc), parent=dialog)
             return
         secret.set('')
         tunnel_feedback.set('Verificando segurança e iniciando o túnel em segundo plano…')
+
+    def see_saved_key():
+        """Owner-only temporary reveal: stop screen/command access first."""
+        if not panel.tunnel_settings.secret.is_file():
+            messagebox.showinfo('Cofre NavixX', 'Nenhuma chave criptografada foi salva.',
+                                parent=dialog)
+            return
+        password = simpledialog.askstring('Cofre NavixX',
+                    'Confirme a senha LOCAL do NavixX para abrir o cofre:',
+                    show='*', parent=dialog)
+        if password is None:
+            return
+        if not panel.owner_account.verify(password):
+            messagebox.showerror('Cofre NavixX',
+                       'Senha incorreta ou temporariamente bloqueada.', parent=dialog)
+            return
+        if panel.session.status()['active']:
+            if not messagebox.askyesno('Proteção da chave',
+                    'O acesso remoto será interrompido antes de mostrar a chave. '
+                    'Depois, reautorize a conexão. Continuar?', parent=dialog):
+                return
+            panel.stop()
+        actual_key = panel.tunnel_settings.load_key()
+        if not actual_key:
+            messagebox.showerror('Cofre NavixX',
+                    'Não foi possível ler a chave do usuário Windows atual.', parent=dialog)
+            return
+        vault = tk.Toplevel(dialog)
+        vault.title('NavixX — Cofre local')
+        vault.geometry('520x215')
+        vault.resizable(False, False)
+        vault.configure(bg=panel.COLORS['surface'])
+        vault.transient(dialog)
+        panel._text(vault, 'Chave protegida • exibição temporária', 13, 'bold',
+                    panel.COLORS['cyan']).pack(anchor='w', padx=18, pady=(15, 9))
+        value = tk.StringVar(value=actual_key)
+        field = tk.Entry(vault, textvariable=value, show='•', font=('Consolas', 10),
+                         bg=panel.COLORS['surface2'], fg='white', relief='flat',
+                         state='readonly', readonlybackground=panel.COLORS['surface2'])
+        field.pack(fill='x', padx=18, ipady=8)
+        panel._text(vault, 'Não fotografe, envie ou compartilhe esta credencial.', 10,
+                    color=panel.COLORS['red']).pack(anchor='w', padx=18, pady=(12, 7))
+
+        def hide_key():
+            value.set('')
+            if vault.winfo_exists():
+                vault.destroy()
+
+        def reveal_temporarily():
+            field.configure(show='')
+            vault.after(12_000, hide_key)
+
+        panel._button(vault, 'Mostrar por 12 segundos', reveal_temporarily,
+                      tone='primary').pack(anchor='e', padx=18)
+        vault.protocol('WM_DELETE_WINDOW', hide_key)
 
     actions = tk.Frame(remote, bg=panel.COLORS['surface'])
     actions.pack(fill='x', pady=(7, 0))
@@ -164,6 +259,8 @@ def open_assistant(panel):
                   tone='primary').pack(side='left', padx=(0, 8))
     panel._button(actions, 'Desconectar túnel', panel.disconnect_tunnel,
                   tone='danger').pack(side='left')
+    panel._button(remote, 'Meu cofre • ver chave salva com senha',
+                  see_saved_key).pack(anchor='w', pady=(11, 0))
 
     def refresh_tunnel_label():
         if dialog.winfo_exists():
@@ -171,7 +268,7 @@ def open_assistant(panel):
             dialog.after(1800, refresh_tunnel_label)
     dialog.after(2200, refresh_tunnel_label)
 
-    remote = step(3, 'Vincule no ChatGPT uma única vez',
+    remote = step(4, 'Vincule no ChatGPT uma única vez',
                   'Abra ChatGPT → Plugins → + → Adicionar servidor MCP personalizado → Tunnel. '
                   'Escolha o mesmo ID. O ChatGPT precisa solicitar sua autorização; '
                   'o NavixX não pode aceitar permissões por outra pessoa.')
@@ -184,7 +281,7 @@ def open_assistant(panel):
     panel._button(links, 'Guia oficial', lambda: webbrowser.open(TUNNEL_GUIDE)
                   ).pack(side='left')
 
-    local = step(4, 'Pareamento local avançado (opcional)',
+    local = step(5, 'Pareamento local avançado (opcional)',
                  'Para clientes MCP no mesmo computador, o botão abaixo copia a credencial '
                  'de curta duração. A conexão automática acima não exige copiar esse código.')
     panel._button(local, 'Copiar pareamento protegido', panel.copy_pairing).pack(
