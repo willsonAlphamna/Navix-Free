@@ -1,8 +1,20 @@
 """Windows-only geometry regression for the old 570px-height clipping bug."""
 
 import sys
+import time
 
 import pytest
+
+
+def _tk_root(tk):
+    """Cloud runners occasionally provide a broken Tcl path; retry once."""
+    for attempt in range(2):
+        try:
+            return tk.Tk()
+        except tk.TclError as error:
+            if attempt:
+                pytest.skip(f'Interface Tk indisponível neste executor Windows: {error}')
+            time.sleep(0.3)
 
 
 @pytest.mark.skipif(sys.platform != 'win32', reason='Requires a native Windows desktop')
@@ -10,7 +22,7 @@ def test_narrow_sidebar_keeps_language_section_scrollable():
     import tkinter as tk
     from navix.gui import ScrollableFrame
 
-    root = tk.Tk()
+    root = _tk_root(tk)
     try:
         root.geometry('270x300')
         viewport = ScrollableFrame(root, '#101b2e', width=250)
@@ -35,7 +47,7 @@ def test_pinned_language_footer_remains_visible_while_menu_scrolls():
     import tkinter as tk
     from navix.gui import ScrollableFrame
 
-    root = tk.Tk()
+    root = _tk_root(tk)
     try:
         root.geometry('220x420')
         sidebar = tk.Frame(root, bg='#0d2936', width=220)
