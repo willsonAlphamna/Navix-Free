@@ -1,0 +1,450 @@
+"""Owner-controlled Secure MCP Tunnel lifecycle and recovery.
+
+No key or local Bearer token is sent to a shell command line, saved to a log,
+or shipped in the installer. A user must authorize a Navix session first.
+"""
+
+import ctypes
+from ctypes import wintypes
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from urllib import error as urlerror
+from urllib import parse as urlparse
+from urllib import request as urlrequest
+
+
+TUNNEL_ID = re.compile(r'^tunnel_[a-fA-F0-9]{32}$')
+_BACKOFF = (3, 8, 20, 45, 90)
+
+
+def _local_health_base(url):
+    """Trust only an HTTP listener on the current computer."""
+    try:
+        parsed = urlparse.urlsplit(url.strip())
+    except ValueError:
+        return ''
+    if parsed.scheme != 'http' or parsed.hostname not in ('localhost', '127.0.0.1', '::1'):
+        return ''
+    if parsed.username is not None or parsed.password is not None:
+        return ''
+    try:
+        port = parsed.port
+    except ValueError:
+        return ''
+    if not port:
+        return ''
+    return f'http://{parsed.netloc}'
+
+
+def _health_snapshot(base, timeout=1.5):
+    """Inspect the official loopback probes; never infer ChatGPT authorization."""
+    opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+
+    def fetch(path):
+        try:
+            with opener.open(base + path, timeout=timeout) as reply:
+                return reply.status, reply.read(65536)
+        except urlerror.HTTPError as failure:
+            return failure.code, b''
+
+    live, _ = fetch('/healthz')
+    if live != 200:
+        return 'health_failed'
+    ready, _ = fetch('/readyz')
+    if ready != 200:
+        return 'starting' if ready == 503 else 'health_failed'
+    try:
+        code, payload = fetch('/health?details=true')
+        if code == 200:
+            details = json.loads(payload)
+            control = details.get('components', {}).get('control-plane', {})
+            if control.get('status') == 'degraded':
+                return 'remote_degraded'
+    except (ValueError, TypeError, UnicodeError):
+        pass  # Older clients can expose only /healthz and /readyz.
+    return 'ready'
+
+
+def _diagnose_runtime_line(line):
+    """Only return controlled categories, never an untrusted log line or secret."""
+    value = line.lower()
+    if any(code in value for code in ('401 unauthorized', 'status 401', 'http 401', '401:')):
+        return 'Credencial do túnel recusada (401). Use uma chave Runtime com Tunnels Read + Use.'
+    if any(code in value for code in ('403 forbidden', 'status 403', 'http 403', '403:')):
+        return 'A conta não tem acesso ao túnel (403). Confira Tunnels Read + Use.'
+    if '429' in value and any(term in value for term in ('http', 'rate', 'status')):
+        return 'Serviço temporariamente limitado (429). Aguarde e tente novamente.'
+    if 'address already in use' in value or 'only one usage of each socket' in value:
+        return 'Porta de diagnóstico ocupada por outro programa.'
+    if ('cloudflared' in value and
+            any(term in value for term in ('not found', 'no such file', 'cannot find', 'missing'))):
+        return 'Componente cloudflared não encontrado na instalação.'
+    if ('tunnel' in value and 'not found' in value) or 'unknown tunnel id' in value:
+        return 'ID de túnel não encontrado. Verifique o vínculo na sua organização.'
+    if any(term in value for term in ('connection refused', 'network is unreachable',
+                                      'no such host', 'connection reset', 'i/o timeout')):
+        return 'Falha de rede ou acesso ao serviço. Confira conexão, VPN e firewall.'
+    return ''
+
+
+def bundled_tunnel_client():
+    """Find the signed-upstream binary included in the Windows installer."""
+    locations = [Path(sys.executable).resolve().parent / 'tunnel-client.exe']
+    if getattr(sys, '_MEIPASS', None):
+        locations.insert(0, Path(sys._MEIPASS) / 'tunnel-client.exe')
+    locations.append(Path(__file__).resolve().parent.parent / 'tunnel-client.exe')
+    for location in locations:
+        if location.is_file():
+            return str(location)
+    return shutil.which('tunnel-client')
+
+
+class _Blob(ctypes.Structure):
+    _fields_ = [('cbData', wintypes.DWORD),
+                ('pbData', ctypes.POINTER(ctypes.c_ubyte))]
+
+
+def _dpapi(data, protect):
+    """Bind an opt-in saved secret to the current Windows login via DPAPI."""
+    if sys.platform != 'win32':
+        raise OSError('Armazenamento protegido disponível somente no Windows.')
+    raw = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
+    source = _Blob(len(data), ctypes.cast(raw, ctypes.POINTER(ctypes.c_ubyte)))
+    result = _Blob()
+    library = ctypes.windll.crypt32
+    operation = library.CryptProtectData if protect else library.CryptUnprotectData
+    operation.argtypes = [ctypes.POINTER(_Blob), ctypes.c_void_p,
+                          ctypes.POINTER(_Blob), ctypes.c_void_p, ctypes.c_void_p,
+                          wintypes.DWORD, ctypes.POINTER(_Blob)]
+    operation.restype = wintypes.BOOL
+    # CRYPTPROTECT_UI_FORBIDDEN; sensitive data is never displayed in a dialog.
+    ok = operation(ctypes.byref(source), None, None, None, None, 1,
+                   ctypes.byref(result))
+    if not ok:
+        raise ctypes.WinError()
+    try:
+        return ctypes.string_at(result.pbData, result.cbData)
+    finally:
+        release = ctypes.windll.kernel32.LocalFree
+        release.argtypes = [ctypes.c_void_p]
+        release.restype = ctypes.c_void_p
+        release(ctypes.cast(result.pbData, ctypes.c_void_p))
+
+
+class TunnelSettings:
+    """Store non-secret tunnel identity and optionally a DPAPI-encrypted key."""
+
+    def __init__(self, directory):
+        self.directory = Path(directory)
+        self.config = self.directory / 'tunnel-settings.json'
+        self.secret = self.directory / 'tunnel-secret.bin'
+
+    def load(self):
+        try:
+            data = json.loads(self.config.read_text(encoding='utf-8'))
+            tunnel_id = str(data.get('tunnel_id', ''))
+            return tunnel_id if TUNNEL_ID.fullmatch(tunnel_id) else ''
+        except (OSError, ValueError, TypeError):
+            return ''
+
+    def load_key(self):
+        try:
+            return _dpapi(self.secret.read_bytes(), False).decode('utf-8')
+        except (OSError, ValueError, UnicodeError):
+            return ''
+
+    def save(self, tunnel_id, key=None, remember=False):
+        if not TUNNEL_ID.fullmatch(tunnel_id):
+            raise ValueError('Identificador do túnel inválido.')
+        self.directory.mkdir(parents=True, exist_ok=True)
+        self.config.write_text(json.dumps({'tunnel_id': tunnel_id}), encoding='utf-8')
+        if remember and key:
+            protected = _dpapi(key.encode('utf-8'), True)
+            self.secret.write_bytes(protected)
+        elif self.secret.exists():
+            self.secret.unlink()
+
+    def forget(self):
+        for path in (self.secret, self.config):
+            if path.exists():
+                path.unlink()
+
+
+class TunnelManager:
+    """No PowerShell: validate, run and supervise tunnel-client in background."""
+
+    def __init__(self, session, service, on_event=None, executable=None,
+                 popen=subprocess.Popen, run=subprocess.run, clock=time.monotonic):
+        self.session = session
+        self.service = service
+        self.on_event = on_event or (lambda event, result: None)
+        self.executable = executable or bundled_tunnel_client()
+        self.popen = popen
+        self.run = run
+        self.clock = clock
+        self.lock = threading.RLock()
+        self.process = None
+        self.tunnel_id = ''
+        self.api_key = ''
+        self.enabled = False
+        self.pending = False
+        self.attempts = 0
+        self.retry_at = 0
+        self.started_at = 0
+        self.connected_url = ''
+        self.error = ''
+        self.last_reason = ''
+        self.health_url_file = None
+        self.health_state = 'unknown'
+        self._health_process = None
+
+    def _clear_health_file(self):
+        path = self.health_url_file
+        self.health_url_file = None
+        if path is not None:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _health_watch(self, process):
+        """Background-only checks: GUI ticks never wait on network requests."""
+        failures = 0
+        while True:
+            with self.lock:
+                if self.process is not process or not self.enabled:
+                    return
+                url_file = self.health_url_file
+                start = self.started_at
+            base = ''
+            try:
+                if url_file is not None:
+                    base = _local_health_base(url_file.read_text(encoding='utf-8')[:500])
+            except OSError:
+                pass
+            try:
+                state = _health_snapshot(base) if base else 'unknown'
+            except (OSError, urlerror.URLError, TimeoutError):
+                state = 'health_failed'
+            with self.lock:
+                if self.process is not process or not self.enabled:
+                    return
+                previous = self.health_state
+                self.health_state = state
+                if state == 'health_failed' and base:
+                    failures += 1
+                else:
+                    failures = 0
+                if state != previous:
+                    self._event('health_' + state, 'warning' if state in ('health_failed', 'remote_degraded') else 'ok')
+                # Restart only a previously discoverable health listener that
+                # stays unreachable. An older client lacking this API is not killed.
+                if failures >= 3 and self.clock() - start >= 20:
+                    self._terminate()
+                    self.error = 'O cliente deixou de responder às verificações locais de saúde.'
+                    self.attempts += 1
+                    self.retry_at = self.clock() + _BACKOFF[min(self.attempts - 1, len(_BACKOFF) - 1)]
+                    self._event('health_restart', 'warning')
+                    return
+            time.sleep(6)
+
+    def _read_runtime_output(self, process):
+        """Classify stderr/stdout in memory; never persist raw text or tokens."""
+        stream = getattr(process, 'stdout', None)
+        if stream is None:
+            return
+        try:
+            for line in stream:
+                reason = _diagnose_runtime_line(line[:2000])
+                if reason:
+                    with self.lock:
+                        if self.process is process:
+                            self.last_reason = reason
+        except (OSError, UnicodeError):
+            pass
+
+    def _event(self, event, result='ok'):
+        # Controlled event codes only. Never log process environment or key.
+        self.on_event('tunnel.' + event, result)
+
+    def _environment(self):
+        if not self.session.status()['active'] or not self.service.ready:
+            raise RuntimeError('Autorize uma sessão NavixX e aguarde MCP pronto.')
+        if not self.executable or not Path(self.executable).is_file():
+            raise FileNotFoundError('Cliente de túnel não encontrado no aplicativo.')
+        if not TUNNEL_ID.fullmatch(self.tunnel_id):
+            raise ValueError('Informe o ID válido do seu túnel OpenAI.')
+        if not self.api_key or len(self.api_key.strip()) < 15:
+            raise ValueError('Informe a chave OpenAI do seu próprio túnel.')
+        url = f'http://127.0.0.1:{self.service.port}/mcp'
+        self._clear_health_file()
+        handle, health_filename = tempfile.mkstemp(prefix='navix-health-', suffix='.url')
+        os.close(handle)
+        self.health_url_file = Path(health_filename)
+        env = os.environ.copy()
+        env.update({
+            'CONTROL_PLANE_API_KEY': self.api_key,
+            'CONTROL_PLANE_TUNNEL_ID': self.tunnel_id,
+            'MCP_SERVER_URL': url,
+            'MCP_EXTRA_HEADERS': 'Authorization: Bearer ' + self.session.token,
+            'MCP_DISCOVERY_EXTRA_HEADERS': 'Authorization: Bearer ' + self.session.token,
+            # Another installed tunnel may already own 127.0.0.1:8080.
+            'HEALTH_LISTEN_ADDR': '127.0.0.1:0',
+            'HEALTH_URL_FILE': health_filename,
+        })
+        # The GUI is authoritative. Ignore shell profiles inherited from a
+        # previous manual pilot that could override the target or tunnel.
+        for setting in ('TUNNEL_CLIENT_CONFIG', 'TUNNEL_CLIENT_PROFILE',
+                        'TUNNEL_CLIENT_PROFILE_FILE'):
+            env.pop(setting, None)
+        return env, url
+
+    def configure(self, tunnel_id, api_key):
+        if not TUNNEL_ID.fullmatch(tunnel_id):
+            raise ValueError('O ID deve começar com tunnel_ e ter 32 dígitos hexadecimais.')
+        if len(api_key.strip()) < 15:
+            raise ValueError('Chave OpenAI ausente ou incompleta.')
+        with self.lock:
+            self.tunnel_id, self.api_key = tunnel_id, api_key.strip()
+            self.enabled = True
+            self.attempts = 0
+            self.retry_at = 0
+
+    def connect(self):
+        """Blocking diagnostic; call from a worker thread, never Tk mainloop."""
+        with self.lock:
+            if self.process and self.process.poll() is None:
+                return 'Túnel já está em execução.'
+            if self.pending:
+                return 'Conexão já está em andamento.'
+            self.pending = True
+        try:
+            env, url = self._environment()
+            flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+            self._event('doctor_start')
+            diagnostic = self.run([self.executable, 'doctor', '--explain'], env=env,
+                                  capture_output=True, text=True, timeout=35,
+                                  creationflags=flags)
+            if diagnostic.returncode != 0 or 'RESULT ok' not in diagnostic.stdout:
+                self._event('doctor_failed', 'error')
+                failed = re.findall(r'^CHECK\s+([a-zA-Z0-9_-]+)\s+FAIL',
+                                    (diagnostic.stdout or ''), flags=re.MULTILINE)
+                checks = ', '.join(failed[:4]) if failed else 'controle de acesso ou MCP'
+                raise RuntimeError(f'Diagnóstico falhou em: {checks}. Revise ID, chave e permissões OpenAI.')
+            self._event('doctor_ok')
+            with self.lock:
+                if not self.enabled or not self.session.status()['active']:
+                    return 'Sessão encerrada durante o diagnóstico.'
+                self.process = self.popen([self.executable, 'run'], env=env,
+                                          stdin=subprocess.DEVNULL,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.STDOUT,
+                                          text=True, encoding='utf-8', errors='replace',
+                                          creationflags=flags)
+                self.connected_url = url
+                self.started_at = self.clock()
+                self.error = ''
+                self.last_reason = ''
+                self.health_state = 'unknown'
+                threading.Thread(target=self._read_runtime_output,
+                                 args=(self.process,), daemon=True).start()
+                threading.Thread(target=self._health_watch,
+                                 args=(self.process,), daemon=True).start()
+            self._event('started')
+            return 'Túnel iniciado. Confirme o plugin uma vez no ChatGPT.'
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
+            # Only our controlled summary is exposed; no original CLI output.
+            with self.lock:
+                self.error = str(error)
+                self._clear_health_file()
+                self.attempts += 1
+                self.retry_at = self.clock() + _BACKOFF[min(self.attempts - 1, len(_BACKOFF) - 1)]
+            self._event('start_failed', 'error')
+            return self.error
+        finally:
+            with self.lock:
+                self.pending = False
+
+    def check(self):
+        """Return a machine-checkable state and schedule safe retry if needed."""
+        with self.lock:
+            if not self.enabled:
+                return 'desligado'
+            if not self.session.status()['active']:
+                self.stop()
+                return 'sessão encerrada'
+            if self.process:
+                return_code = self.process.poll()
+                if return_code is None:
+                    current_url = f'http://127.0.0.1:{self.service.port}/mcp'
+                    if self.service.ready and self.connected_url == current_url:
+                        if self.clock() - self.started_at > 90:
+                            self.attempts = 0
+                        return {
+                            'ready': 'túnel pronto localmente · ChatGPT não verificado',
+                            'starting': 'cliente ativo · aguardando prontidão',
+                            'remote_degraded': 'cliente ativo · conexão externa degradada',
+                            'health_failed': 'cliente ativo · sem resposta de saúde',
+                        }.get(self.health_state, 'cliente ativo · conexão externa não verificada')
+                    self._terminate()
+                    self.attempts = 0
+                    self.retry_at = 0
+                    self._event('endpoint_changed', 'warning')
+                else:
+                    self.process = None
+                    self._clear_health_file()
+                    self.health_state = 'unknown'
+                    self.error = (f'O cliente de túnel encerrou (código {return_code}). '
+                                  + (self.last_reason or
+                                     'Causa não identificada; verifique também o firewall ou a chave Runtime.'))
+                    self.attempts += 1
+                    self.retry_at = self.clock() + _BACKOFF[min(self.attempts - 1, len(_BACKOFF) - 1)]
+                    self._event('process_exited', 'error')
+            if self.pending:
+                return 'iniciando'
+            if self.attempts >= 5 and (
+                    'Diagnóstico falhou' in self.error or
+                    '401' in self.last_reason or '403' in self.last_reason):
+                return 'falha: intervenção necessária'
+            return 'reconectar' if self.clock() >= self.retry_at else 'aguardando reconexão'
+
+    def _terminate(self):
+        process = self.process
+        self.process = None
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=4)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        self._clear_health_file()
+        self.health_state = 'unknown'
+
+    def request_reconnect(self):
+        """Owner-initiated repair, preserving the current authorized session."""
+        with self.lock:
+            if not self.enabled:
+                return False
+            self._terminate()
+            self.attempts = 0
+            self.retry_at = 0
+            self.error = ''
+            self.last_reason = ''
+            self._event('repair_requested')
+            return True
+
+    def stop(self):
+        with self.lock:
+            self.enabled = False
+            self._terminate()
+            self.api_key = ''
+            self.connected_url = ''
+            self._event('stopped')

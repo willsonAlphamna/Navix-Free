@@ -63,3 +63,24 @@ def test_unknown_permission(tmp_path):
 
 def test_non_ascii_token_denied(tmp_path):
     assert not Session(tmp_path).authenticates('inválido')
+
+def test_long_explicit_session_and_invalid_durations(tmp_path):
+    session = Session(tmp_path, clock=lambda: 100)
+    session.activate(['browser', 'desktop', 'files', 'commands'], minutes=240)
+    assert session.status()['remaining_seconds'] == 14_400
+    assert session.status()['permissions'] == ['browser', 'commands', 'desktop', 'files']
+    for duration in (0, 241, True, 2.5):
+        with pytest.raises(ValueError):
+            session.activate(['browser'], minutes=duration)
+
+
+def test_no_expiry_is_opt_in_and_revoked_on_stop(tmp_path):
+    session = Session(tmp_path, clock=lambda: 100)
+    session.activate(['browser'], minutes=None)
+    assert session.status()['unlimited'] is True
+    assert session.status()['remaining_seconds'] is None
+    session.require('browser')
+    session.stop()
+    assert not session.status()['active']
+    with pytest.raises(PermissionError):
+        session.require('browser')

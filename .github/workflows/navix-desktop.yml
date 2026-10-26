@@ -1,6 +1,9 @@
 name: Navix Desktop - Windows piloto
 on:
   push:
+    branches: [feature/navix-desktop-zero, codex/navix-desktop-full-tools]
+    paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
+  pull_request:
     branches: [feature/navix-desktop-zero]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
@@ -42,6 +45,37 @@ jobs:
           python -m pip freeze | Out-File -Encoding utf8 DEPENDENCIES.txt
           python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --icon assets/navix.ico --add-data "assets;assets" --hidden-import pystray._win32 --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --noconfirm --clean --console --onedir --name NavixPython --collect-all playwright --collect-all mcp --hidden-import pyautogui --hidden-import PIL.Image --hidden-import tkinter python_runner.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item dist\NavixPython dist\NavixDesktop\python-runtime -Recurse
+      - name: Incorporar tunnel-client oficial com SHA-256 verificado
+        shell: pwsh
+        run: |
+          $version = 'v0.0.18'
+          $archive = 'tunnel-client-v0.0.18-windows-amd64.zip'
+          $base = "https://github.com/openai/tunnel-client/releases/download/$version"
+          Invoke-WebRequest "$base/$archive" -OutFile $archive
+          Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile SHA256SUMS.txt
+          $line = Get-Content SHA256SUMS.txt | Where-Object { $_ -match [regex]::Escape($archive) } | Select-Object -First 1
+          if (!$line -or $line -notmatch '^([a-fA-F0-9]{64})\s+') { throw 'Hash oficial não encontrado' }
+          $expected = $Matches[1].ToLowerInvariant()
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($expected -ne $actual) { throw 'SHA-256 do tunnel-client diverge do release oficial' }
+          Expand-Archive $archive -DestinationPath tunnel-client-extracted
+          $binary = Get-ChildItem tunnel-client-extracted -Filter tunnel-client.exe -Recurse | Select-Object -First 1
+          if (!$binary) { throw 'Binário tunnel-client.exe ausente' }
+          $companion = Get-ChildItem tunnel-client-extracted -Filter cloudflared.exe -Recurse | Select-Object -First 1
+          if (!$companion) { throw 'Companion oficial cloudflared.exe ausente do release' }
+          $manifest = Get-ChildItem tunnel-client-extracted -Filter cloudflared-manifest.json -Recurse | Select-Object -First 1
+          if (!$manifest) { throw 'Manifesto do cloudflared ausente do release' }
+          Copy-Item $binary.FullName dist\NavixDesktop\tunnel-client.exe
+          Copy-Item $companion.FullName dist\NavixDesktop\cloudflared.exe
+          Copy-Item $manifest.FullName dist\NavixDesktop\cloudflared-manifest.json
+          Invoke-WebRequest 'https://raw.githubusercontent.com/openai/tunnel-client/v0.0.18/LICENSE' -OutFile dist\NavixDesktop\tunnel-client-LICENSE.txt
+          & dist\NavixDesktop\tunnel-client.exe help quickstart | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Cliente de túnel não executou no Windows' }
+          & dist\NavixDesktop\tunnel-client.exe cloudflared version | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Companion cloudflared não foi reconhecido' }
       - name: Verificar abertura do executável
         shell: pwsh
         run: |
@@ -67,10 +101,18 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.1.1.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.11.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client.exe")) { throw 'Cliente de túnel não foi incorporado ao instalador' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared.exe")) { throw 'Companion cloudflared não foi incorporado ao instalador' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared-manifest.json")) { throw 'Manifesto cloudflared não foi incorporado' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client-LICENSE.txt")) { throw 'Licença do cliente de túnel ausente' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\unins000.exe")) { throw 'Desinstalador não foi instalado' }
+          if (!(Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Navix Desktop\Desinstalar NavixX Desktop.lnk")) { throw 'Atalho para desinstalar não encontrado' }
+          $startup = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'NavixXDesktop' -ErrorAction SilentlyContinue
+          if ($startup) { throw 'Inicialização automática foi habilitada sem consentimento' }
           $app = Start-Process $exe -PassThru
           Start-Sleep -Seconds 8
           if ($app.HasExited) { throw 'Aplicativo instalado não abriu' }
@@ -88,3 +130,33 @@ jobs:
         with:
           name: NavixDesktop-Diagnostico
           path: desktop/packaged-selftest.json
+
+  publish_windows:
+    name: Publicar instalador público (pré-lançamento)
+    needs: windows
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/navix-desktop-full-tools'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: NavixDesktop-Windows-Piloto
+          path: release
+      - name: Conferir artefato antes da publicação
+        shell: bash
+        run: |
+          test -s release/NavixDesktop-Setup-0.2.11.exe
+          test -s release/SHA256.txt
+          test -s release/packaged-selftest.json
+      - name: Publicar pré-lançamento no GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          gh release create navix-desktop-v0.2.11 release/* \
+            --target "$GITHUB_SHA" \
+            --title "NavixX Desktop 0.2.11 — Diagnóstico de túnel e recuperação automática" \
+            --notes "NavixX Desktop 0.2.11: distingue processo local ativo de prontidão do túnel e confirmação real de chamada ChatGPT; adiciona verificações oficiais de saúde em segundo plano, informa degradação do plano de controle, reinicia um cliente de túnel travado, tenta recuperar falhas transitórias com espera progressiva e usa o botão Reparar conexão para reiniciar o túnel sem pedir novamente a chave da sessão atual. Instalação oferece abertura opcional do painel no login do Windows, desmarcada por padrão; não concede autorização remota automaticamente. Preserva menu azul-petróleo, identidade visual, proteção local, logs e desinstalador. Um plugin cuja sessão expirou no ChatGPT ainda pode exigir nova autorização no ChatGPT. PRÉ-LANÇAMENTO NÃO ASSINADO: o teste ponta a ponta depende do Windows do usuário; Android/iOS e publicação nas lojas pendentes." \
+            --prerelease

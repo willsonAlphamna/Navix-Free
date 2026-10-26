@@ -14,21 +14,25 @@ class Session:
         self.lock = threading.RLock()
         self.token = secrets.token_urlsafe(32)
         self.until = 0.0
+        self.unlimited = False
         self.permissions = set()
 
     def activate(self, permissions, minutes=30):
-        if not 1 <= minutes <= 60:
-            raise ValueError('A sessão deve durar de 1 a 60 minutos.')
-        if not set(permissions) <= {'browser', 'desktop'}:
+        if minutes is not None and (isinstance(minutes, bool) or not isinstance(minutes, int)
+                                    or not 1 <= minutes <= 240):
+            raise ValueError('A sessão deve durar de 1 a 240 minutos, ou Sem prazo.')
+        if not set(permissions) <= {'browser', 'desktop', 'files', 'commands'}:
             raise ValueError('Permissão desconhecida.')
         with self.lock:
             self.permissions = set(permissions)
-            self.until = self.clock() + minutes * 60
+            self.unlimited = minutes is None
+            self.until = 0 if self.unlimited else self.clock() + minutes * 60
         self.audit('session_start', 'ok')
 
     def stop(self):
         with self.lock:
             self.until = 0
+            self.unlimited = False
             self.permissions.clear()
             self.token = secrets.token_urlsafe(32)
         self.audit('session_stop', 'ok')
@@ -39,15 +43,19 @@ class Session:
 
     def require(self, permission):
         with self.lock:
-            if self.clock() >= self.until or permission not in self.permissions:
+            if (not self.unlimited and self.clock() >= self.until) or permission not in self.permissions:
                 self.audit(permission, 'denied')
                 raise PermissionError('Sessão encerrada ou permissão desativada no painel.')
 
     def status(self):
         with self.lock:
-            seconds = max(0, int(self.until - self.clock()))
-            return {'active': seconds > 0, 'remaining_seconds': seconds,
-                    'permissions': sorted(self.permissions) if seconds else []}
+            seconds = None if self.unlimited else max(0, int(self.until - self.clock()))
+            active = self.unlimited or seconds > 0
+            status = {'active': active, 'remaining_seconds': seconds,
+                      'permissions': sorted(self.permissions) if active else []}
+            if self.unlimited:
+                status['unlimited'] = True
+            return status
 
     def audit(self, action, result):
         # Never record tokens, typed text, URLs, page content or screenshots.

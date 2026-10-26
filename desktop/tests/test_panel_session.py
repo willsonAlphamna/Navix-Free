@@ -73,3 +73,57 @@ def test_open_browser_does_not_grant_browser_permission(tmp_path):
     Panel.open_browser(ui, 'integrado')
     assert not ui.busy
     assert ui.session.status()['permissions'] == ['desktop']
+
+
+def test_connect_uses_explicit_file_and_command_choices(tmp_path):
+    ui, _, messages = panel(tmp_path)
+    class Flag:
+        def __init__(self, value): self.value = value
+        def get(self): return self.value
+    ui.browser_allowed = Flag(False)
+    ui.desktop_allowed = Flag(False)
+    ui.files_allowed = Flag(True)
+    ui.commands_allowed = Flag(True)
+    ui.duration_minutes = Flag(60)
+    started = []
+    ui.service.start = lambda: started.append(True)
+    Panel.connect(ui)
+    assert started == [True]
+    assert ui.session.status()['permissions'] == ['commands', 'files']
+    assert ui.session.status()['remaining_seconds'] == 3600
+
+def test_full_access_requires_explicit_confirmation(tmp_path, monkeypatch):
+    ui, _, _ = panel(tmp_path)
+    class Flag:
+        def __init__(self, value): self.value = value
+        def get(self): return self.value
+    ui.browser_allowed = ui.desktop_allowed = ui.files_allowed = ui.commands_allowed = Flag(True)
+    ui.duration_minutes = Flag(240)
+    calls = []
+    ui.service.start = lambda: calls.append('start')
+    monkeypatch.setattr('navix.gui.messagebox.askyesno', lambda *args: False)
+    Panel.connect(ui)
+    assert not ui.session.status()['active'] and not calls
+    monkeypatch.setattr('navix.gui.messagebox.askyesno', lambda *args: True)
+    Panel.connect(ui)
+    assert calls == ['start']
+    assert ui.session.status()['remaining_seconds'] == 14_400
+    assert len(ui.session.status()['permissions']) == 4
+
+
+def test_select_all_does_not_grant_session_without_connect(tmp_path):
+    ui, _, messages = panel(tmp_path)
+    class Flag:
+        def __init__(self): self.value = False
+        def set(self, value): self.value = value
+        def get(self): return self.value
+    ui.browser_allowed = Flag()
+    ui.desktop_allowed = Flag()
+    ui.files_allowed = Flag()
+    ui.commands_allowed = Flag()
+    ui.stop = lambda: ui.session.stop()
+    ui.permissions_changed = lambda: ui.stop()
+    Panel.select_all(ui)
+    assert all(flag.get() for flag in
+               (ui.browser_allowed, ui.desktop_allowed, ui.files_allowed, ui.commands_allowed))
+    assert not ui.session.status()['active']
