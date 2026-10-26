@@ -51,6 +51,12 @@ class Diagnostics:
             'permissions': state['permissions'],
             'tunnel_state': tunnel.check(),
             'tunnel_process_alive': bool(process and process.poll() is None),
+            'tunnel_local_health': getattr(tunnel, 'health_state', 'unknown'),
+            'tunnel_retry_count': getattr(tunnel, 'attempts', 0),
+            'tunnel_last_error_category': (
+                'requires_attention' if 'Diagnóstico falhou' in getattr(tunnel, 'error', '') else
+                'runtime_unavailable' if getattr(tunnel, 'error', '') else 'none'
+            ),
             'browser_worker_present': bool(browser is not None),
             'events': [json.loads(line) for line in recent if line.strip()],
             'secrets_included': False,

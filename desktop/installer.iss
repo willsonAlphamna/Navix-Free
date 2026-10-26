@@ -1,4 +1,4 @@
-#define AppVersion "0.2.10"
+#define AppVersion "0.2.11"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
 AppName=NavixX Desktop
@@ -28,10 +28,14 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 [Files]
 Source: "dist\NavixDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+[Tasks]
+Name: "startwithwindows"; Description: "Abrir o painel NavixX quando eu entrar no Windows (opcional)"; Flags: unchecked
 [Icons]
 Name: "{group}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"
 Name: "{autodesktop}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"
 Name: "{group}\Desinstalar NavixX Desktop"; Filename: "{uninstallexe}"
+[Registry]
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "NavixXDesktop"; ValueData: """{app}\NavixDesktop.exe"" --lang {language}"; Tasks: startwithwindows; Flags: uninsdeletevalue
 [Run]
 Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"; Description: "Abrir NavixX Desktop agora"; Flags: nowait postinstall skipifsilent
 

@@ -101,7 +101,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.10.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.11.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -111,6 +111,8 @@ jobs:
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client-LICENSE.txt")) { throw 'Licença do cliente de túnel ausente' }
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\unins000.exe")) { throw 'Desinstalador não foi instalado' }
           if (!(Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Navix Desktop\Desinstalar NavixX Desktop.lnk")) { throw 'Atalho para desinstalar não encontrado' }
+          $startup = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'NavixXDesktop' -ErrorAction SilentlyContinue
+          if ($startup) { throw 'Inicialização automática foi habilitada sem consentimento' }
           $app = Start-Process $exe -PassThru
           Start-Sleep -Seconds 8
           if ($app.HasExited) { throw 'Aplicativo instalado não abriu' }
@@ -144,7 +146,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.10.exe
+          test -s release/NavixDesktop-Setup-0.2.11.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -153,8 +155,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.10 release/* \
+          gh release create navix-desktop-v0.2.11 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.10 — Ícones sem quadrado, menu petróleo e layout compacto" \
-            --notes "NavixX Desktop 0.2.10: remove o quadrado azul atrás do símbolo no cabeçalho da instalação, com PNG transparente; substitui os ícones genéricos do menu por desenhos vetoriais de linha iluminada, sem placas; menu em azul-petróleo; idioma fixado no rodapé para permanecer visível; interface compacta para telas pequenas, com textos mais curtos e painéis reorganizados. Mantém o sistema de conexão, cofre de senhas, logs, desinstalador e doações Pix da versão 0.2.9. O recurso multi-PC por convite está em planejamento, não foi ativado. PRÉ-LANÇAMENTO SEM ASSINATURA DIGITAL: Android/iOS e publicação nas lojas pendentes." \
+            --title "NavixX Desktop 0.2.11 — Diagnóstico de túnel e recuperação automática" \
+            --notes "NavixX Desktop 0.2.11: distingue processo local ativo de prontidão do túnel e confirmação real de chamada ChatGPT; adiciona verificações oficiais de saúde em segundo plano, informa degradação do plano de controle, reinicia um cliente de túnel travado, tenta recuperar falhas transitórias com espera progressiva e usa o botão Reparar conexão para reiniciar o túnel sem pedir novamente a chave da sessão atual. Instalação oferece abertura opcional do painel no login do Windows, desmarcada por padrão; não concede autorização remota automaticamente. Preserva menu azul-petróleo, identidade visual, proteção local, logs e desinstalador. Um plugin cuja sessão expirou no ChatGPT ainda pode exigir nova autorização no ChatGPT. PRÉ-LANÇAMENTO NÃO ASSINADO: o teste ponta a ponta depende do Windows do usuário; Android/iOS e publicação nas lojas pendentes." \
             --prerelease

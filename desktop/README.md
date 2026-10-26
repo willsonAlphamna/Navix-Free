@@ -1,4 +1,4 @@
-# NavixX Desktop 0.2.10 — identidade visual e ergonomia (pré-lançamento Windows)
+# NavixX Desktop 0.2.11 — recuperação de conexão (pré-lançamento Windows)
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,10 +6,14 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.10.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
+1. Instale `NavixDesktop-Setup-0.2.11.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
 2. Ao abrir, **crie uma senha local do NavixX** (mínimo 10 caracteres). Na próxima abertura, entre com essa senha. Este não é um login OpenAI ou conta sincronizada na nuvem.
 3. Selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
 4. Para acesso ChatGPT, abra **Assistente**. Siga os cartões ilustrados: entrar na Plataforma OpenAI, criar o túnel, gerar uma **chave Runtime OpenAI com Tunnels Read + Use** e colar o ID e a credencial. O programa oferece links diretos ao painel oficial. O cliente de túnel está incorporado: **não precisa de PowerShell**.
+
+**Confiabilidade da conexão (em desenvolvimento):** o processo de túnel aberto **não significa** que o ChatGPT está conectado. O painel verifica as rotas locais `/healthz`, `/readyz` e, quando disponível, a saúde do plano de controle do cliente oficial. Uma sessão externa só é homologada após uma chamada de ferramenta real no ChatGPT. O NavixX recomeça tentativas de rede transitórias com intervalo progressivo (máximo de 90 s), sem insistir indefinidamente em falhas permanentes de credencial. O botão **Reparar conexão** reinicia o cliente com a autorização atual, sem pedir a chave novamente. Caso a autorização do plugin no ChatGPT seja revogada ou sua sessão termine, o usuário precisará reautorizar no próprio ChatGPT.
+
+O instalador oferece opção **desmarcada por padrão** para abrir o painel no login do Windows. Essa opção **não autoriza controle remoto nem desbloqueia o painel automaticamente**; o proprietário continua responsável por iniciar sua sessão autorizada.
 5. Marque **Lembrar chave criptografada neste usuário Windows (DPAPI)**. Ela nunca aparece automaticamente no formulário. No **Meu cofre**, é possível consultá-la temporariamente após informar novamente a senha local; uma sessão remota ativa será encerrada antes de revelar a chave. Não compartilhe capturas de tela com segredos.
 6. No ChatGPT, vincule o túnel em **Plugins → + → Adicionar servidor MCP personalizado → Tunnel** e aceite os avisos. Esse consentimento individual não pode ser automatizado.
 7. **PARAR ACESSO** revoga a sessão e interrompe o túnel. **Bloquear painel** também encerra o acesso e exige novamente o login local. O acesso temporário dura 30, 60, 120 ou 240 minutos; **Sem prazo** é opcional, exige confirmação extra e só dura enquanto o programa estiver aberto.
@@ -52,6 +56,22 @@ não garante eliminação imediata de avisos; reputação pode levar tempo.
 
 Usuários devem baixar apenas do GitHub Releases oficial e conferir a origem
 e o hash publicado. Não é necessário desligar o SmartScreen.
+
+## Novidades da versão 0.2.11
+
+- **Status honesto:** um processo em execução não equivale a uma sessão ativa
+  no ChatGPT. A confirmação final exige chamar uma ferramenta no próprio chat.
+- **Saúde em segundo plano:** a aplicação lê `/healthz`, `/readyz` e detalhes
+  de controle do `tunnel-client`, quando presentes; nunca expõe essas portas
+  à rede externa.
+- **Recuperação controlada:** reinicia o processo quando a sondagem local fica
+  indisponível repetidamente, tenta novamente falhas transitórias com
+  espera progressiva e interrompe tentativas após erros persistentes de acesso.
+- **Um clique para reparo:** o botão existente agora também reinicia o túnel
+  sem revogar a sessão autorizada e mantém registros sem chaves.
+- **Inicialização opcional com o Windows:** somente abre o painel quando o
+  usuário seleciona a tarefa no instalador. Nenhuma autorização remota é
+  concedida automaticamente.
 
 ## Novidades da versão 0.2.10
 

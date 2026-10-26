@@ -896,9 +896,16 @@ class Panel:
 
     def repair(self):
         if self.service.ready:
-            self.show('Servidor MCP funcionando. A autorização e a credencial foram preservadas.')
+            self.show('Servidor MCP local funcionando. Verificando também o cliente de túnel.')
             if not self.session.status()['active']:
                 self.show('Sessão encerrada. Clique em Conectar / Autorizar para autorizar uma nova sessão.')
+            elif self.tunnel.request_reconnect():
+                self.show('Reiniciando o túnel e repetindo o diagnóstico automaticamente. '
+                          'A autorização existente foi preservada.')
+                self._launch_tunnel_worker()
+                self.show('O acesso do ChatGPT ainda depende de o plugin aceitar uma chamada real.')
+            else:
+                self.show('Túnel ainda não configurado. Abra Assistente para vincular sua conta.')
             return
         if self.service.thread and self.service.thread.is_alive():
             self.show('Servidor MCP ainda iniciando. Aguarde; a autorização foi preservada.')
@@ -908,7 +915,8 @@ class Panel:
         self.service.start()
         if hasattr(self, 'tunnel'):
             self.tunnel.service = self.service
-        self.show('Servidor MCP reiniciado em nova porta local. Copie novamente o pareamento quando estiver pronto.')
+        self.show('Servidor MCP reiniciado em nova porta local. '
+                  'O cliente de túnel detectará a troca e tentará se reconectar.')
         if self.session.status()['active']:
             self.show('Autorização preservada com o tempo restante original.')
         else:
