@@ -11,7 +11,32 @@ WORDS = {
     'Permissões': ('Permissions', 'Permisos'),
     'Ferramentas': ('Tools', 'Herramientas'),
     'Atividade': ('Activity', 'Actividad'),
+    'Apoie o projeto': ('Support the project', 'Apoya el proyecto'),
     'Assistente': ('Assistant', 'Asistente'),
+    'Desinstalar NavixX Desktop': ('Uninstall NavixX Desktop', 'Desinstalar NavixX Desktop'),
+    'DESINSTALAÇÃO': ('UNINSTALL', 'DESINSTALACIÓN'),
+    'Remova o aplicativo pelo desinstalador oficial. Você poderá escolher se deseja excluir também credenciais, configurações e logs.': (
+        'Remove the app with its official uninstaller. You may also choose to delete credentials, settings and logs.',
+        'Elimina la aplicación con su desinstalador oficial. También puedes borrar credenciales, ajustes y registros.'),
+    'Apoie o NavixX': ('Support NavixX', 'Apoya NavixX'),
+    'Contribuição voluntária para o desenvolvimento do projeto ALFAMNA.': (
+        'Voluntary contribution to the ALFAMNA project.',
+        'Contribución voluntaria al proyecto ALFAMNA.'),
+    'DOAÇÃO VIA PIX': ('DONATE BY PIX', 'DONAR POR PIX'),
+    'Valor livre. Nenhuma doação é necessária para usar o NavixX.': (
+        'Any amount. Donations are never required to use NavixX.',
+        'Cualquier importe. No es necesario donar para usar NavixX.'),
+    'Beneficiário informado: Wilson Neves de Almeida • Campo Grande/MS': (
+        'Stated beneficiary: Wilson Neves de Almeida • Campo Grande, Brazil',
+        'Beneficiario indicado: Wilson Neves de Almeida • Campo Grande, Brasil'),
+    'Chave Pix aleatória informada (opção adicional):': (
+        'Provided random Pix key (additional option):',
+        'Clave Pix aleatoria proporcionada (opción adicional):'),
+    'Copiar Pix Copia e Cola': ('Copy Pix payment code', 'Copiar código Pix'),
+    'Copiar chave aleatória': ('Copy random Pix key', 'Copiar clave Pix aleatoria'),
+    'O QR Code usa uma chave Pix do tipo e-mail, diferente da chave aleatória. Confira o beneficiário e a instituição no aplicativo bancário antes de confirmar. Este projeto é independente do Banco do Brasil.': (
+        'The QR uses an email Pix key, different from the random key. Verify the payee and bank in your banking app before confirming. This project is independent of Banco do Brasil.',
+        'El QR usa una clave Pix de correo distinta de la clave aleatoria. Comprueba beneficiario y banco antes de confirmar. Este proyecto es independiente del Banco do Brasil.'),
     'Minimizar': ('Minimize', 'Minimizar'),
     'Bloquear painel': ('Lock panel', 'Bloquear panel'),
     'MENU': ('MENU', 'MENÚ'),

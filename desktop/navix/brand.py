@@ -186,6 +186,10 @@ def navigation_icon(name, size=22):
         d.rounded_rectangle((10, 8, 55, 58), radius=8, outline=color, width=line)
         for y in (24, 35, 46):
             d.line([(23, y), (46, y)], fill=accent if y == 35 else color, width=4)
+    elif name == 'doacoes':
+        d.polygon([(33, 54), (12, 34), (11, 23), (16, 17), (24, 16),
+                   (33, 25), (42, 16), (50, 17), (55, 23), (54, 34)],
+                  fill=accent, outline=color)
     elif name == 'assistente':
         d.ellipse((18, 18, 48, 48), outline=color, width=line)
         d.line([(33, 8), (33, 18), (33, 48), (33, 58)], fill=accent, width=4)

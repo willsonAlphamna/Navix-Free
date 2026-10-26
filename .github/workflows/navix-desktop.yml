@@ -101,7 +101,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.8.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.9.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -109,6 +109,8 @@ jobs:
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared.exe")) { throw 'Companion cloudflared não foi incorporado ao instalador' }
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\cloudflared-manifest.json")) { throw 'Manifesto cloudflared não foi incorporado' }
           if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\tunnel-client-LICENSE.txt")) { throw 'Licença do cliente de túnel ausente' }
+          if (!(Test-Path "$env:LOCALAPPDATA\Programs\NavixDesktop\unins000.exe")) { throw 'Desinstalador não foi instalado' }
+          if (!(Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Navix Desktop\Desinstalar NavixX Desktop.lnk")) { throw 'Atalho para desinstalar não encontrado' }
           $app = Start-Process $exe -PassThru
           Start-Sleep -Seconds 8
           if ($app.HasExited) { throw 'Aplicativo instalado não abriu' }
@@ -142,7 +144,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.8.exe
+          test -s release/NavixDesktop-Setup-0.2.9.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -151,8 +153,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.8 release/* \
+          gh release create navix-desktop-v0.2.9 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.8 — Login local, cofre e guia ilustrado" \
-            --notes "NavixX Desktop 0.2.8: acrescenta login local com senha, bloqueio que revoga o acesso remoto, assistente ilustrado com links oficiais para criação de túnel e chave Runtime, cofre DPAPI com reautenticação e revelação temporária, logo e ícones 3D. Mantém os reparos do túnel 0.2.7, tradução PT-BR/EN/ES e proteção por permissões. PRÉ-LANÇAMENTO: exige validação real no PC do proprietário. Login de nuvem e instalação pública em um clique ainda dependem de infraestrutura e consentimento individual." \
+            --title "NavixX Desktop 0.2.9 — Interface adaptável, desinstalação e apoio Pix" \
+            --notes "NavixX Desktop 0.2.9: barra de rolagem no menu lateral e nas páginas para telas pequenas e DPI alto; seção Idioma sempre acessível; botão Desinstalar e atalho no menu Iniciar; opção explícita, não padrão, de apagar configurações/credenciais/logs durante a desinstalação; página Apoie o NavixX com QR e Pix Copia e Cola fornecidos pelo proprietário e validação estrutural CRC16. A chave Pix aleatória e a chave por e-mail do QR são distintas; confirme sempre o recebedor no app bancário. Mantém login local, cofre DPAPI, conexões autenticadas e permissões da 0.2.8. PRÉ-LANÇAMENTO SEM ASSINATURA DIGITAL: Android/iOS e publicação nas lojas ainda não foram realizados." \
             --prerelease

@@ -16,7 +16,41 @@ from .diagnostics import Diagnostics
 from .i18n import LANGUAGES, load_language, save_language, translate
 from .owner_auth import OwnerAccount
 from .tunnel_manager import TunnelManager, TunnelSettings
+from .donations import PIX_COPY_AND_PASTE, PIX_RANDOM_KEY, pix_qr_image
 from . import __version__
+
+
+class ScrollableFrame(tk.Frame):
+    """A width-aware vertical viewport for low-resolution and high-DPI screens."""
+
+    def __init__(self, parent, background, **kwargs):
+        super().__init__(parent, bg=background, **kwargs)
+        self.canvas = tk.Canvas(self, bg=background, bd=0, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.pack(side='right', fill='y')
+        self.canvas.pack(side='left', fill='both', expand=True)
+        self.content = tk.Frame(self.canvas, bg=background)
+        self._window = self.canvas.create_window((0, 0), window=self.content, anchor='nw')
+        self.content.bind('<Configure>', self._update_scrollregion)
+        self.canvas.bind('<Configure>', self._resize_content)
+        self.canvas.bind('<Enter>', lambda event: self.canvas.bind_all('<MouseWheel>', self._mousewheel))
+        self.canvas.bind('<Leave>', lambda event: self.canvas.unbind_all('<MouseWheel>'))
+        self.bind('<Destroy>', self._cleanup, add='+')
+
+    def _update_scrollregion(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox('all'))
+
+    def _resize_content(self, event):
+        self.canvas.itemconfigure(self._window, width=event.width)
+
+    def _mousewheel(self, event):
+        if self.canvas.winfo_exists():
+            self.canvas.yview_scroll(-int(event.delta / 120), 'units')
+
+    def _cleanup(self, event):
+        if event.widget is self:
+            self.canvas.unbind_all('<MouseWheel>')
 
 
 class Panel:
@@ -248,9 +282,11 @@ class Panel:
         shell = tk.Frame(self.root, bg=self.COLORS['base'])
         self.shell = shell
         shell.pack(fill='both', expand=True)
-        side = tk.Frame(shell, width=250, bg=self.COLORS['sidebar'])
-        side.pack(side='left', fill='y')
-        side.pack_propagate(False)
+        side_view = ScrollableFrame(shell, self.COLORS['sidebar'], width=250)
+        side_view.pack(side='left', fill='y')
+        side_view.pack_propagate(False)
+        side = side_view.content
+        self.side_view = side_view
         brand = tk.Frame(side, bg=self.COLORS['sidebar'], padx=16, pady=22)
         brand.pack(fill='x')
         try:
@@ -274,12 +310,14 @@ class Panel:
         from PIL import ImageTk
         from .brand import navigation_icon
         self.nav_icons = {key: ImageTk.PhotoImage(navigation_icon(key, size=26)) for key in
-                          ('inicio', 'permissoes', 'ferramentas', 'atividade', 'assistente', 'minimizar')}
+                          ('inicio', 'permissoes', 'ferramentas', 'atividade',
+                           'doacoes', 'assistente', 'minimizar')}
         for key, label in (
             ('inicio', 'Início'),
             ('permissoes', 'Permissões'),
             ('ferramentas', 'Ferramentas'),
             ('atividade', 'Atividade'),
+            ('doacoes', 'Apoie o projeto'),
         ):
             item = self._button(side, label, lambda selected=key: self.show_page(selected),
                                 tone='subtle', anchor='w', image=self.nav_icons[key],
@@ -313,7 +351,7 @@ class Panel:
                    textvariable=self.side_duration, anchor='w').pack(
             fill='x', pady=(5, 0))
         footer = tk.Frame(side, bg=self.COLORS['sidebar'])
-        footer.pack(side='bottom', fill='x', padx=18, pady=15)
+        footer.pack(fill='x', padx=18, pady=(16, 20))
         self._text(footer, 'IDIOMA', 8, 'bold', self.COLORS['cyan']).pack(anchor='w')
         language_picker = ttk.Combobox(footer, textvariable=self.selected_language_name,
                                       values=list(LANGUAGES.values()), style='Navix.TCombobox',
@@ -342,14 +380,22 @@ class Panel:
         main.grid_rowconfigure(0, weight=1)
         main.grid_columnconfigure(0, weight=1)
         self.pages = {}
-        for key in ('inicio', 'permissoes', 'ferramentas', 'atividade'):
-            page = tk.Frame(main, bg=self.COLORS['base'])
-            page.grid(row=0, column=0, sticky='nsew')
+        self.page_frames = {}
+        for key in ('inicio', 'permissoes', 'ferramentas', 'atividade', 'doacoes'):
+            if key == 'atividade':
+                page = tk.Frame(main, bg=self.COLORS['base'])
+                view = page
+            else:
+                view = ScrollableFrame(main, self.COLORS['base'])
+                page = view.content
+            view.grid(row=0, column=0, sticky='nsew')
+            self.page_frames[key] = view
             self.pages[key] = page
         self._home_page(self.pages['inicio'])
         self._permissions_page(self.pages['permissoes'])
         self._tools_page(self.pages['ferramentas'])
         self._activity_page(self.pages['atividade'])
+        self._donations_page(self.pages['doacoes'])
         self.show_page('inicio')
 
     def _start_flag_animation(self):
@@ -415,7 +461,7 @@ class Panel:
         self.show('Túnel remoto desconectado pelo proprietário.')
 
     def show_page(self, key):
-        self.pages[key].tkraise()
+        self.page_frames[key].tkraise()
         for page_key, button in self.nav_buttons.items():
             active = page_key == key
             button.configure(bg=self.COLORS['surface2'] if active else self.COLORS['sidebar'],
@@ -559,6 +605,79 @@ class Panel:
         self._button(row, 'Copiar pareamento', self.copy_pairing,
                      tone='primary').pack(side='left', padx=(0, 8))
         self._button(row, 'Assistente', self.open_setup).pack(side='left')
+
+        uninstall_edge, uninstall_card = self._card(page)
+        uninstall_edge.pack(fill='x', pady=(16, 8))
+        self._text(uninstall_card, 'DESINSTALAÇÃO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(uninstall_card, 'Remova o aplicativo pelo desinstalador oficial. '
+                   'Você poderá escolher se deseja excluir também credenciais, configurações e logs.',
+                   10, color=self.COLORS['subtle'], wraplength=550,
+                   justify='left').pack(anchor='w', pady=(7, 14))
+        self._button(uninstall_card, 'Desinstalar NavixX Desktop',
+                     self.uninstall_application, tone='danger').pack(anchor='w')
+
+    def _donations_page(self, page):
+        self._section_title(page, 'Apoie o NavixX',
+                            'Contribuição voluntária para o desenvolvimento do projeto ALFAMNA.')
+        edge, card = self._card(page, pad=22)
+        edge.pack(fill='x', pady=(0, 16))
+        self._text(card, 'DOAÇÃO VIA PIX', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
+        self._text(card, 'Valor livre. Nenhuma doação é necessária para usar o NavixX.',
+                   10, color=self.COLORS['subtle']).pack(anchor='w', pady=(7, 12))
+        from PIL import ImageTk
+        self.pix_photo = ImageTk.PhotoImage(pix_qr_image(size=218))
+        tk.Label(card, image=self.pix_photo, bg='#ffffff', padx=8, pady=8).pack(anchor='w')
+        self._text(card, 'Beneficiário informado: Wilson Neves de Almeida • Campo Grande/MS',
+                   10, color=self.COLORS['text'], wraplength=550).pack(anchor='w', pady=(12, 5))
+        self._text(card, 'Chave Pix aleatória informada (opção adicional):',
+                   9, color=self.COLORS['subtle']).pack(anchor='w', pady=(4, 2))
+        self._text(card, PIX_RANDOM_KEY, 9, color=self.COLORS['text']).pack(anchor='w')
+        row = tk.Frame(card, bg=self.COLORS['surface'])
+        row.pack(fill='x', pady=(13, 0))
+        self._button(row, 'Copiar Pix Copia e Cola',
+                     lambda: self._copy_donation(PIX_COPY_AND_PASTE), tone='primary').pack(
+                         side='left', padx=(0, 9))
+        self._button(row, 'Copiar chave aleatória',
+                     lambda: self._copy_donation(PIX_RANDOM_KEY)).pack(side='left')
+        self._text(card, 'O QR Code usa uma chave Pix do tipo e-mail, diferente da chave aleatória. '
+                   'Confira o beneficiário e a instituição no aplicativo bancário antes de confirmar. '
+                   'Este projeto é independente do Banco do Brasil.',
+                   9, color=self.COLORS['subtle'], wraplength=530,
+                   justify='left').pack(anchor='w', pady=(15, 0))
+
+    def _copy_donation(self, value):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(value)
+        messagebox.showinfo('Pix copiado',
+                            'Código copiado. Confira o destinatário no seu banco antes de pagar.',
+                            parent=self.root)
+
+    def uninstall_application(self):
+        """Delegate removal to Inno Setup; its own UI decides optional data erasure."""
+        if sys.platform != 'win32':
+            messagebox.showinfo('Desinstalar NavixX',
+                                'A desinstalação está disponível no Windows instalado.',
+                                parent=self.root)
+            return
+        uninstaller = Path(sys.executable).resolve().parent / 'unins000.exe'
+        if not uninstaller.is_file():
+            messagebox.showinfo('Desinstalar NavixX',
+                                'Abra Configurações do Windows → Aplicativos → NavixX Desktop '
+                                '→ Desinstalar. O desinstalador não foi encontrado nesta pasta.',
+                                parent=self.root)
+            return
+        if not messagebox.askyesno('Desinstalar NavixX',
+                                   'Deseja abrir o desinstalador? O acesso remoto será encerrado. '
+                                   'O assistente perguntará separadamente sobre apagar os dados locais.',
+                                   parent=self.root):
+            return
+        self.stop()
+        try:
+            subprocess.Popen([str(uninstaller)], cwd=str(uninstaller.parent))
+        except OSError as error:
+            messagebox.showerror('Desinstalar NavixX', str(error), parent=self.root)
+            return
+        self.root.after(500, self.close)
 
     def _activity_page(self, page):
         self._section_title(page, 'Atividade e eventos',
