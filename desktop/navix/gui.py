@@ -899,12 +899,12 @@ class Panel:
             self.show('Servidor MCP local funcionando. Verificando também o cliente de túnel.')
             if not self.session.status()['active']:
                 self.show('Sessão encerrada. Clique em Conectar / Autorizar para autorizar uma nova sessão.')
-            elif self.tunnel.request_reconnect():
+            elif getattr(self, 'tunnel', None) is not None and self.tunnel.request_reconnect():
                 self.show('Reiniciando o túnel e repetindo o diagnóstico automaticamente. '
                           'A autorização existente foi preservada.')
                 self._launch_tunnel_worker()
                 self.show('O acesso do ChatGPT ainda depende de o plugin aceitar uma chamada real.')
-            else:
+            elif getattr(self, 'tunnel', None) is not None:
                 self.show('Túnel ainda não configurado. Abra Assistente para vincular sua conta.')
             return
         if self.service.thread and self.service.thread.is_alive():
