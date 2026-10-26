@@ -1,4 +1,4 @@
-# NavixX Desktop 0.2.9 — interface adaptável, desinstalação e doações (pré-lançamento Windows)
+# NavixX Desktop 0.2.10 — identidade visual e ergonomia (pré-lançamento Windows)
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental
@@ -6,7 +6,7 @@ a Opera, automação de desktop, arquivos e comandos autorizados por sessão.
 
 ## Uso do instalador
 
-1. Instale `NavixDesktop-Setup-0.2.9.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
+1. Instale `NavixDesktop-Setup-0.2.10.exe`, sem administrador. Escolha PT-BR (padrão), English ou Español.
 2. Ao abrir, **crie uma senha local do NavixX** (mínimo 10 caracteres). Na próxima abertura, entre com essa senha. Este não é um login OpenAI ou conta sincronizada na nuvem.
 3. Selecione as permissões e clique em **Conectar / Autorizar**. A autorização nunca é automática.
 4. Para acesso ChatGPT, abra **Assistente**. Siga os cartões ilustrados: entrar na Plataforma OpenAI, criar o túnel, gerar uma **chave Runtime OpenAI com Tunnels Read + Use** e colar o ID e a credencial. O programa oferece links diretos ao painel oficial. O cliente de túnel está incorporado: **não precisa de PowerShell**.
@@ -53,7 +53,23 @@ não garante eliminação imediata de avisos; reputação pode levar tempo.
 Usuários devem baixar apenas do GitHub Releases oficial e conferir a origem
 e o hash publicado. Não é necessário desligar o SmartScreen.
 
-## Novidades da versão 0.2.9
+## Novidades da versão 0.2.10
+
+- **Sem quadrado no logotipo de instalação:** a arte menor no topo do instalador
+  agora tem transparência real e preserva o símbolo Circuito Vivo/NavixX isolado.
+  O ícone do executável também continua com transparência.
+- **Ícones modernos:** navegação com traços refinados e brilho discreto,
+  sem tiles ou placas quadradas azuis. O menu recebe azul-petróleo e um
+  contraste mais alto no item selecionado.
+- **Painel mais compacto:** ao detectar monitor pequeno ou DPI que reduz o
+  espaço útil, botões, cartões e espaçamentos encolhem; os textos usam quebras
+  para caber na área disponível. A rolagem continua quando o conteúdo não cabe.
+- **Idioma sempre à vista:** o seletor saiu da lista que rola e ficou fixo no
+  rodapé lateral, para não desaparecer ao rolar o menu.
+- **Acesso à máquina de familiar por convite:** registrado como arquitetura
+  futura em `ACESSO_ASSISTIDO_MULTI_PC.md`; não está implementado ou ativo.
+
+## Melhorias anteriores da versão 0.2.9
 
 - **Layout:** menu lateral e páginas de conteúdo têm rolagem independente. O campo **Idioma**,
   o copyright e a bandeira permanecem acessíveis em monitores pequenos ou com ampliação DPI.

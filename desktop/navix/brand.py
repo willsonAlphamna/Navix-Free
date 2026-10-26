@@ -148,56 +148,102 @@ def wizard_image(size=(480, 918)):
 
 
 def wizard_small_image(size=(256, 256)):
-    """Brand inset from the right trim line of the installer header."""
-    image = _gradient(size).convert('RGBA')
-    emblem = icon_image(174)
-    # Asymmetric spacing keeps the emblem visibly away from the right border.
-    image.alpha_composite(emblem, (25, (size[1] - emblem.height) // 2))
-    return image.convert('RGB')
+    """Floating brand emblem; transparent pixels avoid the blue square in Setup."""
+    image = Image.new('RGBA', size, (0, 0, 0, 0))
+    emblem = icon_image(round(min(size) * 0.69))
+    # A small offset to the left preserves the right-side breathing room.
+    image.alpha_composite(emblem, (round(size[0] * 0.10),
+                                   (size[1] - emblem.height) // 2))
+    return image
 
 
 def navigation_icon(name, size=22):
-    """Glossy vector-like navigation tiles, legible at small Windows DPI."""
-    factor = 3
-    s = size * factor
-    image = Image.new('RGBA', (s, s), (0, 0, 0, 0))
-    # Subtle 3D bezel, top specular highlight and cast shadow.
-    d = ImageDraw.Draw(image)
-    d.rounded_rectangle((4, 6, s-3, s-2), radius=17,
-                        fill=(2, 9, 24, 145))
-    d.rounded_rectangle((4, 2, s-4, s-7), radius=16,
-                        fill=(24, 58, 95, 240), outline=(70, 144, 207, 255), width=3)
-    d.arc((8, 4, s-8, s//2+11), 185, 350, fill=(138, 224, 252, 150), width=3)
-    color = (238, 249, 255, 255)
-    accent = (68, 225, 242, 255)
-    line = max(3, 2 * factor)
+    """Contemporary, transparent line icons, inspired by the Lucide visual language.
+
+    No square badge: the petroleum-blue sidebar itself provides the background.
+    Supersampling gives rounded, sharp lines on low-DPI Windows displays.
+    """
+    factor = 5
+    extent = 24 * factor
+    image = Image.new('RGBA', (extent, extent), (0, 0, 0, 0))
+    glow = Image.new('RGBA', image.size, (0, 0, 0, 0))
+    canvas = ImageDraw.Draw(image)
+    halo = ImageDraw.Draw(glow)
+    white = (226, 245, 255, 255)
+    cyan = (70, 222, 234, 255)
+    blue = (113, 166, 252, 255)
+
+    def pos(point):
+        return (round(point[0] * factor), round(point[1] * factor))
+
+    def line(points, color=white, weight=1.8):
+        points = [pos(p) for p in points]
+        radius = max(1, round(weight * factor / 2))
+        halo.line(points, fill=(30, 170, 227, 110), width=round((weight + 1.9) * factor),
+                  joint='curve')
+        canvas.line([(x, y + round(0.5 * factor)) for x, y in points],
+                    fill=(3, 20, 38, 190), width=round((weight + 0.4) * factor),
+                    joint='curve')
+        canvas.line(points, fill=color, width=round(weight * factor), joint='curve')
+        for x, y in (points[0], points[-1]):
+            canvas.ellipse((x-radius, y-radius, x+radius, y+radius), fill=color)
+
+    def circle(center, radius, color=cyan, width=1.7, fill=None):
+        x, y = pos(center)
+        rr = round(radius * factor)
+        canvas.ellipse((x-rr, y-rr, x+rr, y+rr), fill=fill,
+                       outline=color, width=round(width * factor))
+
     if name == 'inicio':
-        d.line([(8, 31), (33, 9), (58, 31)], fill=color, width=line, joint='curve')
-        d.line([(16, 29), (16, 57), (50, 57), (50, 29)], fill=color, width=line)
-        d.rectangle((29, 42, 38, 57), outline=accent, width=3)
+        line([(3.4, 10.9), (12, 3.8), (20.6, 10.9)], cyan, 2)
+        line([(5.8, 10), (5.8, 20), (18.2, 20), (18.2, 10)], white)
+        line([(10, 20), (10, 13.6), (14, 13.6), (14, 20)], blue)
     elif name == 'permissoes':
-        d.rounded_rectangle((15, 9, 51, 57), radius=11, outline=color, width=line)
-        d.line([(24, 32), (31, 39), (44, 25)], fill=accent, width=line, joint='curve')
+        line([(12, 2.6), (20, 5.8), (19.4, 13.6), (17, 17.6), (12, 21.6),
+              (7, 17.6), (4.6, 13.6), (4, 5.8), (12, 2.6)], white, 1.8)
+        line([(8.2, 12.4), (10.8, 15), (16, 9.4)], cyan, 2.3)
     elif name == 'ferramentas':
-        d.ellipse((12, 12, 40, 40), outline=color, width=line)
-        d.line([(37, 36), (56, 55)], fill=accent, width=line)
-        d.ellipse((8, 8, 15, 15), fill=accent)
+        for y, knob in ((6, 8), (12, 16), (18, 10)):
+            line([(3, y), (21, y)], blue, 1.5)
+            circle((knob, y), 2.5, white, 1.65, (16, 44, 71, 255))
     elif name == 'atividade':
-        d.rounded_rectangle((10, 8, 55, 58), radius=8, outline=color, width=line)
-        for y in (24, 35, 46):
-            d.line([(23, y), (46, y)], fill=accent if y == 35 else color, width=4)
+        line([(2.6, 12.2), (7.4, 12.2), (10, 5.7), (13.8, 18.4),
+              (16.5, 10.8), (18, 12.2), (21.4, 12.2)], cyan, 1.9)
+        circle((12, 12), 10, blue, 1.0)
     elif name == 'doacoes':
-        d.polygon([(33, 54), (12, 34), (11, 23), (16, 17), (24, 16),
-                   (33, 25), (42, 16), (50, 17), (55, 23), (54, 34)],
-                  fill=accent, outline=color)
+        heart = []
+        for i in range(37):
+            t = i * math.pi * 2 / 36
+            x = 12 + 0.49 * (16 * math.sin(t)**3)
+            y = 12.3 - 0.50 * (13 * math.cos(t) - 5 * math.cos(2*t)
+                                - 2 * math.cos(3*t) - math.cos(4*t))
+            heart.append((x, y))
+        line(heart, cyan, 1.85)
     elif name == 'assistente':
-        d.ellipse((18, 18, 48, 48), outline=color, width=line)
-        d.line([(33, 8), (33, 18), (33, 48), (33, 58)], fill=accent, width=4)
-        d.line([(8, 33), (18, 33), (48, 33), (58, 33)], fill=accent, width=4)
+        line([(8, 3.4), (8, 8.2), (6.4, 8.2), (6.4, 12.2),
+              (10.2, 16), (13.7, 16), (17.5, 12.2), (17.5, 8.2),
+              (15.9, 8.2), (15.9, 3.4)], white)
+        line([(12, 16), (12, 21)], cyan, 2)
+        line([(6.5, 9), (17.5, 9)], blue, 1.35)
+        line([(4, 3), (4, 6)], cyan, 1.2)
+        line([(2.5, 4.5), (5.5, 4.5)], cyan, 1.2)
     elif name == 'minimizar':
-        d.rounded_rectangle((8, 11, 58, 55), radius=7, outline=color, width=line)
-        d.line([(22, 45), (44, 45)], fill=accent, width=line)
-    return image.resize((size, size), Image.Resampling.LANCZOS)
+        line([(3.7, 3.7), (9.7, 9.7)], cyan)
+        line([(9.7, 5.6), (9.7, 9.7), (5.6, 9.7)], white)
+        line([(20.3, 20.3), (14.3, 14.3)], cyan)
+        line([(14.3, 18.4), (14.3, 14.3), (18.4, 14.3)], white)
+    elif name == 'bloquear':
+        line([(7.4, 10), (7.4, 7.4), (8.6, 4.7), (12, 3.6),
+              (15.4, 4.7), (16.6, 7.4), (16.6, 10)], cyan, 1.9)
+        line([(5.5, 10), (18.5, 10), (18.5, 21), (5.5, 21), (5.5, 10)], white)
+        circle((12, 15), 1.1, cyan, 0.8, cyan)
+
+    image = Image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(2.5 * factor)), image)
+    image = image.resize((size, size), Image.Resampling.LANCZOS)
+    # Discard nearly invisible edge spill from the glow so Windows never paints
+    # a faint square around the glyph on light installer/desktop backgrounds.
+    image.putalpha(image.getchannel('A').point(lambda alpha: 0 if alpha < 12 else alpha))
+    return image
 
 
 def brazil_flag_frames(size=(32, 20), count=4):

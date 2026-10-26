@@ -101,7 +101,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.9.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.10.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -144,7 +144,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.9.exe
+          test -s release/NavixDesktop-Setup-0.2.10.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -153,8 +153,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.9 release/* \
+          gh release create navix-desktop-v0.2.10 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.9 — Interface adaptável, desinstalação e apoio Pix" \
-            --notes "NavixX Desktop 0.2.9: barra de rolagem no menu lateral e nas páginas para telas pequenas e DPI alto; seção Idioma sempre acessível; botão Desinstalar e atalho no menu Iniciar; opção explícita, não padrão, de apagar configurações/credenciais/logs durante a desinstalação; página Apoie o NavixX com QR e Pix Copia e Cola fornecidos pelo proprietário e validação estrutural CRC16. A chave Pix aleatória e a chave por e-mail do QR são distintas; confirme sempre o recebedor no app bancário. Mantém login local, cofre DPAPI, conexões autenticadas e permissões da 0.2.8. PRÉ-LANÇAMENTO SEM ASSINATURA DIGITAL: Android/iOS e publicação nas lojas ainda não foram realizados." \
+            --title "NavixX Desktop 0.2.10 — Ícones sem quadrado, menu petróleo e layout compacto" \
+            --notes "NavixX Desktop 0.2.10: remove o quadrado azul atrás do símbolo no cabeçalho da instalação, com PNG transparente; substitui os ícones genéricos do menu por desenhos vetoriais de linha iluminada, sem placas; menu em azul-petróleo; idioma fixado no rodapé para permanecer visível; interface compacta para telas pequenas, com textos mais curtos e painéis reorganizados. Mantém o sistema de conexão, cofre de senhas, logs, desinstalador e doações Pix da versão 0.2.9. O recurso multi-PC por convite está em planejamento, não foi ativado. PRÉ-LANÇAMENTO SEM ASSINATURA DIGITAL: Android/iOS e publicação nas lojas pendentes." \
             --prerelease

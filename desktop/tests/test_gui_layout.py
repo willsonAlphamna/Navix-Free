@@ -28,3 +28,35 @@ def test_narrow_sidebar_keeps_language_section_scrollable():
         assert language.winfo_exists()
     finally:
         root.destroy()
+
+
+@pytest.mark.skipif(sys.platform != 'win32', reason='Requires a native Windows desktop')
+def test_pinned_language_footer_remains_visible_while_menu_scrolls():
+    import tkinter as tk
+    from navix.gui import ScrollableFrame
+
+    root = tk.Tk()
+    try:
+        root.geometry('220x420')
+        sidebar = tk.Frame(root, bg='#0d2936', width=220)
+        sidebar.pack(fill='both', expand=True)
+        sidebar.pack_propagate(False)
+        view = ScrollableFrame(sidebar, '#0d2936')
+        view.pack(side='top', fill='both', expand=True)
+        for i in range(16):
+            tk.Label(view.content, text=f'Menu {i}', height=2,
+                     bg='#0d2936', fg='white').pack(fill='x')
+        footer = tk.Frame(sidebar, bg='#0d2936', height=95)
+        footer.pack(side='bottom', fill='x')
+        footer.pack_propagate(False)
+        language = tk.Label(footer, text='IDIOMA', bg='#0d2936', fg='white')
+        language.pack()
+        root.update()
+        assert language.winfo_viewable()
+        old_y = language.winfo_rooty()
+        view.canvas.yview_moveto(1.0)
+        root.update()
+        assert language.winfo_viewable()
+        assert language.winfo_rooty() == old_y
+    finally:
+        root.destroy()

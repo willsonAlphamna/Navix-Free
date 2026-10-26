@@ -1,4 +1,4 @@
-#define AppVersion "0.2.9"
+#define AppVersion "0.2.10"
 [Setup]
 AppId={{CAF0DA60-C25D-4A21-9080-78D57BEA8F0B}
 AppName=NavixX Desktop
@@ -15,6 +15,7 @@ SolidCompression=yes
 WizardStyle=modern
 WizardImageFile=assets\wizard.png
 WizardSmallImageFile=assets\wizard-small.png
+WizardSmallImageBackColor=none
 DisableWelcomePage=no
 SetupIconFile=assets\navix.ico
 UninstallDisplayIcon={app}\NavixDesktop.exe
