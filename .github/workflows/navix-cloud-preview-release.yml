@@ -1,0 +1,41 @@
+name: NavixX Cloud Preview - distribuir instalador aprovado
+on:
+  push:
+    branches: [codex/navixx-cloud-v0_3-foundation]
+    paths: ['.github/workflows/navix-cloud-preview-release.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Recuperar artefato aprovado no Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: NavixX-0.3-CloudPreview-Windows
+          run-id: 40630152433
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+      - name: Validar instalador, autoteste e SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.3.exe'
+          test -s "$installer"
+          test -s release/SHA256.txt
+          test -s release/packaged-selftest.json
+          expected="$(sha256sum "$installer" | cut -d ' ' -f 1)"
+          grep -qi "$expected" release/SHA256.txt
+      - name: Publicar pré-lançamento claramente identificado
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          gh release create navixx-cloud-v0.3.0-alpha.3-preview release/* \
+            --target '${{ github.sha }}' --prerelease --latest=false \
+            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.3 (Windows)' \
+            --notes 'VERSÃO DE TESTE NÃO ASSINADA. Inclui instalador independente que preserva o NavixX 0.2.11 e perfis separados. Testes Windows, instalador e desinstalador passaram na execução GitHub Actions 40630152433. O servidor Cloudflare de testes funciona para pareamento, OAuth e WebSocket simulado, mas o controle remoto público permanece DESATIVADO. A integração ChatGPT e a execução de comandos em Windows real não foram aprovadas para uso público; não distribuir como produto final. O usuário deve conceder permissões localmente e autorizar seu próprio dispositivo no ChatGPT. Documentação e código: pull request #13.'
