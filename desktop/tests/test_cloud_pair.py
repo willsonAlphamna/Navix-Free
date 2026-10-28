@@ -59,6 +59,7 @@ class CloudPairTests(unittest.TestCase):
         self.assertTrue(req.full_url.startswith('https://navixx.example/api/pair/start'))
         body=json.loads(req.data)
         self.assertEqual(body['agent_secret'],self.identity.agent_secret)
+        self.assertEqual(req.get_header('User-agent'),'NavixX-Desktop-Cloud/0.3.0')
         self.assertNotIn('Authorization',req.headers)
         self.assertNotIn(self.identity.agent_secret,req.full_url)
 
