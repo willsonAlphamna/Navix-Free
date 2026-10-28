@@ -2,7 +2,7 @@ import asyncio
 import json
 import unittest
 from navix.cloud import CloudSettings
-from navix.cloud_client import CloudRequestHandler, connect_once, device_url
+from navix.cloud_client import CloudRequestHandler, connect_once, device_url, run_until_stopped
 
 
 class FakeSession:
@@ -104,6 +104,25 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(PermissionError):
             await connect_once(self.settings,'device_1234567890',lambda: '',self.handler,
                                websocket_connect=lambda *a,**kw: None)
+
+    async def test_stop_cancels_active_websocket_immediately(self):
+        started=asyncio.Event()
+        cancelled=asyncio.Event()
+        stop=asyncio.Event()
+        async def fake_connect(*args):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+        runner=asyncio.create_task(run_until_stopped(
+            self.settings,'device_1234567890',lambda:'a'*43,
+            self.handler,stop,connect=fake_connect))
+        await asyncio.wait_for(started.wait(),1)
+        stop.set()
+        await asyncio.wait_for(runner,1)
+        self.assertTrue(cancelled.is_set())
 
 
 if __name__=='__main__':
