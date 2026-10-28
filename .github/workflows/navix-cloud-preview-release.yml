@@ -18,14 +18,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: NavixX-0.3-CloudPreview-Windows
-          run-id: 40633942931
+          run-id: 40637615879
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: release
       - name: Validar instalador, autoteste e SHA-256
         shell: bash
         run: |
           set -euo pipefail
-          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.4.exe'
+          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.5.exe'
           test -s "$installer"
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
@@ -40,7 +40,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navixx-cloud-v0.3.0-alpha.4-preview release/* \
+          gh release create navixx-cloud-v0.3.0-alpha.5-preview release/* \
             --target '${{ github.sha }}' --prerelease --latest=false \
-            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.4 (Windows)' \
-            --notes 'VERSÃO DE TESTE NÃO ASSINADA. Preserva o NavixX 0.2.11 e dados originais por instalar em caminho e perfil separados. Testes de Python, Windows, empacotamento, instalador e desinstalador passaram na execução GitHub Actions 40633942931. A Cloudflare passou no teste sintético de pareamento, OAuth, WebSocket, execução MCP remota e revogação, com controle restrito ao dispositivo de teste; o controle de Windows real e a distribuição no catálogo público do ChatGPT dependem de validação adicional e aprovação da plataforma. Inclui ZIP do plugin para revisão/upload pelo proprietário. Não distribuir como produto final antes da conclusão dos testes e revisão. Documentação e código: pull request #13.'
+            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.5 (Windows)' \
+            --notes 'VERSÃO DE TESTE NÃO ASSINADA. Instalação isolada que preserva NavixX 0.2.11. Compilação, testes Python/Windows, instalador e desinstalador aprovados no GitHub Actions 40637615879. Corrige os comandos rejeitados por diferenças moderadas de horário entre Windows e Cloudflare. O servidor passou no teste sintético de pareamento, OAuth, WebSocket, chamada MCP remota e revogação. A execução em Windows real segue sob verificação e permanece restrita a um dispositivo canário; aprovação pública no ChatGPT depende da revisão da plataforma. Inclui ZIP do plugin criado no ChatGPT. Documentação e código: pull request #13.'
