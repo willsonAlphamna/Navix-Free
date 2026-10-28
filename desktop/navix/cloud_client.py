@@ -85,8 +85,8 @@ class CloudRequestHandler:
                                'ok': False, 'error': 'Operação recusada ou indisponível.'})
 
 
-async def connect_once(settings, device_id, get_access_token, handler, websocket_connect=None):
-    """Connect only with owner-provided OAuth token; no runtime/API key creation."""
+async def connect_once(settings, device_id, get_agent_secret, handler, websocket_connect=None):
+    """Connect only with device-specific random secret; no runtime/API key creation."""
     if websocket_connect is None:
         from websockets.asyncio.client import connect as websocket_connect
     endpoint = device_url(settings, device_id)
@@ -94,8 +94,8 @@ async def connect_once(settings, device_id, get_access_token, handler, websocket
     if inspect.isawaitable(token):
         token = await token
     if not isinstance(token, str) or not 20 <= len(token) <= 8192 or any(c.isspace() for c in token):
-        raise PermissionError('Sessão de identidade indisponível.')
-    async with websocket_connect(endpoint, additional_headers={'Authorization': 'Bearer '+token},
+        raise PermissionError('Credencial do dispositivo indisponível.')
+    async with websocket_connect(endpoint, additional_headers={'X-Navix-Agent-Token': token},
                                  max_size=12*1024*1024, open_timeout=15, ping_interval=20) as ws:
         async for frame in ws:
             await ws.send(await handler.handle(frame))
