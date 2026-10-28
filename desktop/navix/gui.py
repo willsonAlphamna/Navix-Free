@@ -872,8 +872,9 @@ class Panel:
         self.show('Sessão autorizada sem prazo neste processo.' if minutes is None else
                   f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
         if getattr(self, 'cloud_controller', None):
-            # The owner already approved the local permissions. Reuse only an
-            # existing device pairing; never silently grant ChatGPT consent.
+            # Try to reconnect an existing device; if the user has never linked,
+            # request the code automatically instead of sending them through menus.
+            # This does not bypass ChatGPT OAuth consent.
             self._request_cloud_start(manual=False)
         elif hasattr(self, 'tunnel_settings'):
             tunnel_id = self.tunnel_settings.load()
@@ -949,7 +950,7 @@ class Panel:
                 side='left',padx=(7,0))
         tk.Label(box,textvariable=feedback,bg=self.COLORS['surface'],
                  fg=self.COLORS['green'],font=('Segoe UI',9)).pack(pady=(7,2))
-        self._text(box, 'No ChatGPT, conecte o plugin NavixX Cloud. Na página de autorização, '
+        self._text(box, 'PRIMEIRO ACESSO: no ChatGPT, conecte o plugin NavixX Desktop Cloud. Na página de autorização, '
                    'cole o ID e o código e confirme. Se o plugin negar acesso (401), '
                    'reautorize-o no ChatGPT; o PC não pode conceder essa permissão sozinho.',
                    9,color=self.COLORS['subtle'],wraplength=545).pack(pady=4)
@@ -1025,8 +1026,13 @@ class Panel:
                                 if started else 'Navix Cloud: ' +
                                 self.cloud_controller.status()['message'])
             except (PermissionError, ConnectionError, ValueError):
-                self.events.put(('cloud_failure',
-                                 self.cloud_controller.status()['message'], manual))
+                current=self.cloud_controller.status()
+                if current['state']=='unpaired' and self.session.status().get('active'):
+                    # One explicit local authorization is enough to start the
+                    # first-time link wizard. ChatGPT OAuth consent remains manual.
+                    self.events.put(('cloud_needs_pairing',))
+                else:
+                    self.events.put(('cloud_failure',current['message'],manual))
             except Exception:
                 self.events.put(('cloud_failure',
                                  'Falha inesperada na conexão Cloud. Use Reparar conexão.', manual))
@@ -1114,6 +1120,9 @@ class Panel:
                 self._tunnel_worker_running = False
             elif event == ('cloud_start_done',):
                 self._cloud_start_pending = False
+            elif event == ('cloud_needs_pairing',):
+                self.show('NavixX Cloud: primeiro acesso. Gerando automaticamente o código de vínculo...')
+                self.enroll_cloud()
             elif isinstance(event, tuple) and event[0] == 'cloud_failure':
                 self.show('Reparo Cloud: ' + event[1])
                 if event[2]:

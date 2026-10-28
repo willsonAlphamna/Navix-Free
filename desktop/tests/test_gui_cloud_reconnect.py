@@ -1,5 +1,6 @@
 """Cloud GUI wiring without opening a real Windows window."""
 import unittest
+from queue import Queue
 from unittest.mock import MagicMock, patch
 
 try:
@@ -43,6 +44,23 @@ class CloudGuiTests(unittest.TestCase):
         panel.session.activate.assert_called_once_with(['browser'],minutes=30)
         panel.service.start.assert_called_once()
         panel._request_cloud_start.assert_called_once_with(manual=False)
+        panel.cloud_controller.enroll.assert_not_called()
+
+    def test_first_connection_starts_pairing_wizard_when_device_is_unpaired(self):
+        panel=self.panel()
+        panel.events=Queue()
+        panel._cloud_start_pending=False
+        panel.cloud_controller.start.side_effect=PermissionError('Sem vínculo')
+        panel.cloud_controller.status.return_value={
+            'state':'unpaired','message':'Vínculo necessário'}
+        with patch('navix.gui.threading.Thread') as thread:
+            Panel._request_cloud_start(panel,manual=False)
+            thread.call_args.kwargs['target']()
+        queued=[]
+        while not panel.events.empty():
+            queued.append(panel.events.get_nowait())
+        self.assertIn(('cloud_needs_pairing',),queued)
+        self.assertIn(('cloud_start_done',),queued)
         panel.cloud_controller.enroll.assert_not_called()
 
     def test_repair_checks_cloud_when_local_mcp_is_ready(self):

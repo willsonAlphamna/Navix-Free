@@ -26,3 +26,6 @@
 
 ## Verificação externa automatizada
 O fluxo de CI faz testes sem credenciais contra o servidor de staging para validar a disponibilidade HTTPS, descoberta OAuth, desafio 401 e página de autorização. Não envia comandos ao Windows nem utiliza códigos temporários reais.
+
+## Fluxo de primeiro acesso do Windows
+Após o proprietário clicar uma vez em **Conectar / Autorizar**, o cliente tenta a reconexão. Caso o dispositivo não esteja vinculado, o programa abre automaticamente o formulário de ID/código. A confirmação OAuth **deve** ser feita pelo titular no ChatGPT; não existe API legítima que o programa possa acionar para conceder consentimento sem ele.
