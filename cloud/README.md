@@ -13,8 +13,11 @@ O app Windows 0.2.11 e seu túnel privado continuam intactos enquanto este siste
 - Módulo de domínio `src/pairing.mjs` com registro efêmero de dispositivos, códigos de pareamento de seis dígitos e prazo curto, bloqueio de reutilização, limite de tentativas, isolamento de identidade, autorização granular e revogação.
 - Testes automáticos `tests/pairing.test.mjs` para isolamento, expiração, falhas, permissões e revogação.
 - Inventário `MCP_CATALOG.md` da descrição e das 44 ferramentas atuais.
+- Verificador de JWT OAuth em `src/auth.mjs`, com rejeição de assinatura adulterada, escopo insuficiente, emissor ou audiência errados.
+- Worker Cloudflare em `src/worker.mjs` com Durable Object e WebSocket por usuário/dispositivo. **A rota `/mcp` permanece bloqueada (HTTP 503)** até a autenticação, pareamento e controle completos.
+- GitHub Actions executa testes de isolamento e `wrangler deploy --dry-run`, sem publicar nada.
 
-**Importante:** este registro é deliberadamente apenas memória de processo e **não pode** ser implantado diretamente como serviço público multi-instância. A próxima etapa deve mover estado para Durable Objects/SQLite com limites distribuídos e auditoria, sem endpoints de controle até existir validação rigorosa de token OAuth. Os campos `ownerId` usados nos testes são identidades já verificadas em nível superior; **nunca** aceitar um `ownerId` enviado sem autenticação pelo cliente.
+**Importante:** este registro é deliberadamente apenas memória de processo e **não pode** ser implantado diretamente como serviço público multi-instância. A próxima etapa deve persistir o pareamento em Durable Objects/SQLite com limites distribuídos e auditoria, integrá-lo a uma identidade OAuth REAL e ao cliente Windows; o Worker já valida JWT no gateway, mas não há provedor configurado nem despacho remoto de comandos. Nenhuma rota pública de controle está liberada. Os campos `ownerId` usados nos testes são identidades já verificadas em nível superior; **nunca** aceitar um `ownerId` enviado sem autenticação pelo cliente.
 
 ## Arquitetura de produção prevista
 
