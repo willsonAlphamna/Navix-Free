@@ -1,0 +1,19 @@
+{
+  "name": "navixx-cloud-alpha",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-28",
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DEVICE_RELAY",
+        "class_name": "DeviceRelay"
+      }
+    ]
+  },
+  "exports": {
+    "DeviceRelay": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
