@@ -83,8 +83,8 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(reply['result']['args']['path'],'teste')
 
     async def test_device_url_uses_wss_and_never_embeds_token(self):
-        url = device_url(self.settings,'device_12345678')
-        self.assertEqual(url,'wss://navixx.example/api/device/connect?device_id=device_12345678')
+        url = device_url(self.settings,'device_1234567890')
+        self.assertEqual(url,'wss://navixx.example/api/device/connect?device_id=device_1234567890')
         with self.assertRaises(ValueError):
             device_url(self.settings,'../outra-rota')
 
@@ -94,7 +94,7 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         def fake_connect(url, **options):
             captured.update({'url':url, **options})
             return socket
-        await connect_once(self.settings,'device_12345678',lambda: 'a'*32,
+        await connect_once(self.settings,'device_1234567890',lambda: 'a'*32,
                            self.handler,websocket_connect=fake_connect)
         self.assertEqual(captured['additional_headers']['Authorization'],'Bearer '+'a'*32)
         self.assertNotIn('a'*32,captured['url'])
@@ -102,7 +102,7 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_refuses_missing_oauth_token_before_connect(self):
         with self.assertRaises(PermissionError):
-            await connect_once(self.settings,'device_12345678',lambda: '',self.handler,
+            await connect_once(self.settings,'device_1234567890',lambda: '',self.handler,
                                websocket_connect=lambda *a,**kw: None)
 
 
