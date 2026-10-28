@@ -1,6 +1,6 @@
 # NavixX Desktop Cloud — pacote de plugin
 
-Versão 0.3.0, para teste. Esta pasta contém o pacote do plugin remoto MCP para
+Versão do plugin 0.3.1 (Cloud Desktop 0.3.0-alpha.8), para teste. Esta pasta contém o pacote do plugin remoto MCP para
 ChatGPT. O usuário final não precisa criar chave de API ou túnel individual.
 
 ## Uso previsto
@@ -23,3 +23,6 @@ teste do MCP, revisão e aprovação pela OpenAI. Não publicar um pacote com
 ferramentas de execução remota antes dos testes de autorização/revogação.
 
 Fonte: https://developers.openai.com/plugins/deploy/submission
+
+## Autenticação
+O plugin usa MCP Streamable HTTP com modo misto: ferramentas são descobertas sem login, mas o controle do Windows continua bloqueado até o OAuth e a autorização local. A ferramenta exclusiva `navixx_cloud_connection_status` anuncia se o canal está online; não confundir isso com execução remota verificada. Atualizar arquivos do GitHub não atualiza automaticamente o plugin já instalado no ChatGPT. Nunca configurar o conectaX antigo como substituto.

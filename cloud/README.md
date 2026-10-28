@@ -1,9 +1,15 @@
-# NavixX Cloud 0.3.0-alpha.3 — piloto isolado
+# NavixX Cloud 0.3.0-alpha.8 — auditoria e integração
 
-**Estado: pré-lançamento técnico. Ainda não existe plugin público funcionando.**
-O NavixX Desktop 0.2.11 permanece intacto. O servidor de testes responde em
-https://navixx-cloud-staging.navixx-alfamna.workers.dev/healthz, mas `/mcp`
-continua desativado (503). Não anunciar a versão 0.3 como produto final.
+**Estado: código revisado e testes automatizados aprovados; o acesso real ao Windows pelo ChatGPT ainda precisa ser comprovado.**
+O Desktop 0.2.11 permanece isolado e intacto.
+
+## Distinção entre código, implantação e vínculo
+- No GitHub está o código alpha.8; publicá-lo no repositório **não atualiza automaticamente** o Worker Cloudflare nem o plugin instalado no ChatGPT.
+- Em 28/10/2026, a Cloudflare confirmou o binding `NAVIX_PUBLIC_CONTROL=enabled` no Worker `navixx-cloud-staging`. Teste HTTPS confirmou `/healthz`, descoberta OAuth e desafio `401`. Isto NÃO comprova chamada real ao Windows.
+- O código alpha.8 permite descoberta de ferramentas MCP anônima (`auth.type: mixed`) e retorna desafio OAuth por ferramenta. Nenhum comando local é executado sem autenticação OAuth válida, dispositivo vinculado e autorização da sessão Windows.
+- O ChatGPT pode exigir o consentimento inicial do titular. Nenhum código do Windows deve simular aprovação da plataforma.
+- A conclusão requer atualizar Worker, atualizar a publicação do plugin, testar conta real, chamada Windows, queda/reconexão, bloqueio e revogação.
+- Consulte [AUDITORIA_ALPHA8.md](AUDITORIA_ALPHA8.md) e o PR #14 antes de liberar a distribuição geral.
 
 ## Objetivo
 
