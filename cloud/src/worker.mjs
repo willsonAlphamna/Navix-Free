@@ -142,13 +142,14 @@ export class DeviceRelay extends DurableObject {
     if(route==='/pair/state'){
       // The bearer token is opaque and local to this Windows installation.
       const agentSecret=secretFrom(request);
-      const state=await this.pairing.status({deviceId:this.ctx.id.name?.slice(10)||'',agentSecret});
+      const deviceId=(await this.ctx.storage.get('device'))?.deviceId||'';
+      const state=await this.pairing.status({deviceId,agentSecret});
       return json(state);
     }
     if(route==='/pair/approve'){
       try{
         const data=await request.json();
-        const deviceId=this.ctx.id.name?.slice(10)||'';
+        const deviceId=(await this.ctx.storage.get('device'))?.deviceId||'';
         return json(await this.pairing.approve({ownerId:owner,deviceId,code:data.code}));
       }catch{return json({error:'Não foi possível aprovar'},400);}
     }
