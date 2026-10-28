@@ -45,6 +45,7 @@ class Browser:
         self.headless = headless
         self.worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='navix-browser')
         self.pw = self.context = self.process = None
+        self.kind = None
         self.pages = {}
         self.counter = 0
 
@@ -55,7 +56,13 @@ class Browser:
         if kind not in {'integrado', 'opera'}:
             raise ValueError('Navegador deve ser integrado ou opera.')
         if self.context:
-            return
+            try:
+                # A persistent Chromium context can close with its last tab.
+                # An existing Python object does not mean the browser is alive.
+                self.context.cookies()
+                return
+            except Exception:
+                self._close()
         from playwright.sync_api import sync_playwright
         self.pw = sync_playwright().start()
         profile = self.session.directory / ('browser-' + kind)
@@ -82,6 +89,7 @@ class Browser:
             else:
                 self.context = self.pw.chromium.launch_persistent_context(str(profile), headless=self.headless,
                     accept_downloads=True, viewport={'width': 1100, 'height': 760})
+            self.kind = kind
             self.context.set_default_timeout(10_000)
             self.context.set_default_navigation_timeout(20_000)
         except Exception:
@@ -205,6 +213,8 @@ class Browser:
         if operation == 'start':
             self._start(args.get('kind', 'integrado'))
             return {'ok': True}
+        if operation in {'tabs', 'open'} and self.context:
+            self._start(self.kind or 'integrado')
         if not self.context:
             raise RuntimeError('Abra o navegador pelo painel primeiro.')
         if operation == 'tabs':
@@ -299,7 +309,7 @@ class Browser:
             self.pw.stop()
         if self.process and self.process.poll() is None:
             self.process.terminate()
-        self.context = self.pw = self.process = None
+        self.context = self.pw = self.process = self.kind = None
         self.pages.clear()
 
     def close(self):
