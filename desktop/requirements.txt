@@ -5,3 +5,4 @@ Pillow>=11,<13
 uvicorn==0.54.0
 pystray==0.19.5
 qrcode[pil]==8.2
+websockets>=15,<17

@@ -6,6 +6,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from .core import Session
@@ -65,7 +66,8 @@ class Panel:
 
     def __init__(self, root):
         self.root = root
-        directory = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NavixDesktop'
+        directory = Path(os.environ.get('NAVIX_PROFILE_DIR') or
+                         (Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'NavixDesktop'))
         self.directory = directory
         installer_lang = None
         if '--lang' in sys.argv:
@@ -84,6 +86,14 @@ class Panel:
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
         self.tunnel_settings = TunnelSettings(directory)
         self.tunnel = TunnelManager(self.session, self.service, self._tunnel_event)
+        # Staging only: never starts cloud access on application launch.
+        self.cloud_controller = None
+        cloud_url = os.environ.get('NAVIX_CLOUD_WSS_URL', '')
+        if cloud_url:
+            from .cloud_controller import CloudController
+            self.cloud_controller = CloudController(
+                directory, self.session, self.service, cloud_url,
+                on_status=lambda status: self.events.put(status))
         self.tunnel_state = tk.StringVar(value='Túnel desligado')
         self._tunnel_worker_running = False
         self._last_tunnel_state = ''
@@ -649,6 +659,17 @@ class Panel:
                      tone='primary').pack(side='left', padx=(0, 8))
         self._button(row, 'Assistente', self.open_setup).pack(side='left')
 
+        # Public Cloud pairing has its own device credential and never exposes the
+        # localhost MCP bearer token to a remote service.
+        if self.cloud_controller:
+            self._text(pair, 'NAVIX CLOUD 0.3 — cada PC usa um código temporário próprio.',
+                       10, 'bold', self.COLORS['cyan']).pack(anchor='w', pady=(12, 4))
+            cloud_actions = tk.Frame(pair, bg=self.COLORS['surface'])
+            cloud_actions.pack(fill='x')
+            self._button(cloud_actions, 'Vincular ao ChatGPT', self.enroll_cloud,
+                         tone='primary').pack(side='left', padx=(0, 8))
+            self._button(cloud_actions, 'Reconectar nuvem', self.start_cloud).pack(side='left')
+
         uninstall_edge, uninstall_card = self._card(page)
         uninstall_edge.pack(fill='x', pady=(gap, 4 if self.compact_mode else 8))
         self._text(uninstall_card, 'DESINSTALAÇÃO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
@@ -845,6 +866,8 @@ class Panel:
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
+        if self.cloud_controller:
+            self.cloud_controller.stop()
         self.tunnel.stop()
         self.session.stop()
         self.diagnostics.record('session', 'revoked')
@@ -877,6 +900,72 @@ class Panel:
         self.root.clipboard_clear()
         self.root.clipboard_append(json.dumps(data, indent=2))
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
+
+    def _cloud_code_dialog(self, data):
+        box=tk.Toplevel(self.root)
+        box.title('NavixX Cloud — código temporário')
+        box.configure(bg=self.COLORS['surface'])
+        box.geometry('545x255')
+        box.transient(self.root)
+        box.lift()
+        self._text(box, 'Vincule seu PC à sua conta ChatGPT', 15, 'bold',
+                   self.COLORS['cyan']).pack(pady=(15, 9))
+        for name, value in [('ID do computador', data['device_id']),
+                            ('Código de 6 dígitos (válido por 2 minutos)', data['verification_code'])]:
+            line=tk.Frame(box,bg=self.COLORS['surface'])
+            line.pack(fill='x',padx=12,pady=4)
+            self._text(line,name,9,color=self.COLORS['subtle']).pack(anchor='w')
+            entry=tk.Entry(line,bg=self.COLORS['surface2'],fg='#ffffff',
+                           insertbackground='#ffffff',font=('Consolas',11))
+            entry.pack(side='left',fill='x',expand=True)
+            entry.insert(0,value)
+            entry.configure(state='readonly')
+            self._button(line,'Copiar',lambda value=value:self._copy_cloud_value(value)).pack(
+                side='left',padx=(7,0))
+        self._text(box, 'Insira o ID e o código na página de autorização do NavixX. '
+                   'Nunca envie o segredo interno do dispositivo.', 9,
+                   color=self.COLORS['subtle'],wraplength=510).pack(pady=8)
+
+    def _copy_cloud_value(self,value):
+        self.root.clipboard_clear()
+        self.root.clipboard_append(value)
+
+    def enroll_cloud(self):
+        if not self.cloud_controller:
+            self.show('Navix Cloud não configurado no instalador.')
+            return
+        if not self.session.status()['active'] or not self.service.ready:
+            messagebox.showinfo('NavixX','Autorize primeiro uma sessão local e aguarde o MCP ficar pronto.')
+            return
+        def work():
+            try:
+                data=self.cloud_controller.enroll()
+                self.root.after(0,lambda:self._cloud_code_dialog(data))
+                self.events.put('Código temporário gerado. Confirme o dispositivo no ChatGPT.')
+                deadline=time.monotonic()+118
+                while self.session.status()['active'] and time.monotonic()<deadline:
+                    if self.cloud_controller.paired():
+                        self.cloud_controller.start()
+                        self.events.put('Navix Cloud: dispositivo vinculado e conexão iniciada.')
+                        return
+                    time.sleep(3)
+                self.events.put('Pareamento não concluído neste prazo; gere outro código.')
+            except Exception:
+                self.events.put('Navix Cloud: falha de pareamento. Verifique a conexão e tente novamente.')
+        threading.Thread(target=work,daemon=True,name='NavixCloudEnrollment').start()
+
+    def start_cloud(self):
+        if not self.cloud_controller:
+            self.show('Navix Cloud ainda não configurado.')
+            return
+        def work():
+            try:
+                started=self.cloud_controller.start()
+                self.events.put('Navix Cloud: conectando...' if started else
+                                'Navix Cloud: já está conectando.')
+            except Exception:
+                self.events.put('Vincule o computador e autorize uma sessão local antes de reconectar.')
+        threading.Thread(target=work,daemon=True,name='NavixCloudReconnect').start()
 
     def open_setup(self):
         from .setup_assistant import open_assistant

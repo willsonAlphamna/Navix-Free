@@ -1,0 +1,26 @@
+{
+  "name": "navixx-cloud-staging",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-28",
+  "ratelimits": [
+    {
+      "name": "PAIR_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": {"limit": 15, "period": 60}
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DEVICE_RELAY",
+        "class_name": "DeviceRelay"
+      }
+    ]
+  },
+  "exports": {
+    "DeviceRelay": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}
