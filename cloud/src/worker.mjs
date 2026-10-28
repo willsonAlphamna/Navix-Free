@@ -17,6 +17,8 @@ const scopedDevice = url => {
 const stubFor=(env,deviceId)=>env.DEVICE_RELAY.get(env.DEVICE_RELAY.idFromName('device-v1:'+deviceId));
 const secretFrom=req=>req.headers.get('x-navix-agent-token')||'';
 const publicControlEnabled=env=>env.NAVIX_PUBLIC_CONTROL==='enabled';
+const deviceControlAllowed=(env,deviceId)=>publicControlEnabled(env)&&
+  (!env.NAVIX_TEST_DEVICE_ID||env.NAVIX_TEST_DEVICE_ID===deviceId);
 
 async function boundedJson(req,maxBytes=8192) {
   const reader=req.body?.getReader();
@@ -60,8 +62,9 @@ export default {
   async fetch(request,env) {
     const url=new URL(request.url);
     if(url.pathname==='/healthz' && request.method==='GET'){
-      return json({service:'navixx-cloud',version:'0.3.0-alpha.3',
-        public_tools_enabled:publicControlEnabled(env)});
+      return json({service:'navixx-cloud',version:'0.3.0-alpha.4',
+        public_tools_enabled:publicControlEnabled(env),
+        restricted_to_canary:Boolean(env.NAVIX_TEST_DEVICE_ID)});
     }
     if(url.pathname==='/.well-known/oauth-protected-resource' && request.method==='GET'){
       return json({resource:url.origin,authorization_servers:[url.origin],
@@ -124,6 +127,9 @@ export default {
           headers:{'content-type':'application/json','cache-control':'no-store',
             'www-authenticate':challengeFor(request)}});
       }
+      if(!deviceControlAllowed(env,identity.deviceId)){
+        return json({error:'Dispositivo fora do piloto autorizado'},403);
+      }
       return handleMcp(request,{execute:async (tool,args)=>{
         const response=await stubFor(env,identity.deviceId).fetch(new Request(
           'https://device.local/execute',{method:'POST',headers:{
@@ -154,6 +160,10 @@ export default {
     const stub=stubFor(env,deviceId);
 
     if(route==='/api/pair/start'){
+      if(!env.PAIR_RATE_LIMITER)return json({error:'Cadastro temporariamente indisponível'},503);
+      const ip=request.headers.get('cf-connecting-ip')||'unknown';
+      const {success}=await env.PAIR_RATE_LIMITER.limit({key:'pair-start:'+ip});
+      if(!success)return json({error:'Limite de cadastros excedido'},429);
       return stub.fetch(new Request('https://device.local/pair/start',{method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify({deviceId,code:payload.code,agentSecret:payload.agent_secret}),
@@ -198,7 +208,7 @@ export default {
       }));
     }
     if(request.method!=='POST')return json({error:'Método inválido'},405);
-    if(!publicControlEnabled(env))return json({error:'Controle remoto em validação'},503);
+    if(!deviceControlAllowed(env,deviceId))return json({error:'Controle remoto indisponível para este dispositivo'},503);
     try{payload=await boundedJson(request,8*1024*1024);
       validateToolArguments(payload.tool,payload.args||{});
     }catch{return json({error:'JSON ou ferramenta inválida'},400);}
