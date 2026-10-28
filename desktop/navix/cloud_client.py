@@ -101,23 +101,37 @@ async def connect_once(settings, device_id, get_agent_secret, handler, websocket
             await ws.send(await handler.handle(frame))
 
 
-async def run_until_stopped(settings, device_id, get_access_token, handler, stop_event):
-    """Reconnect transient failures with backoff; owner can stop instantly."""
+async def run_until_stopped(settings, device_id, get_agent_secret, handler, stop_event,
+                            connect=connect_once):
+    """Stop cancels the LIVE WebSocket immediately, not only the retry delay."""
     delay=1
     while not stop_event.is_set():
         if not handler.session.status().get('active', False):
             return
+        task=asyncio.create_task(connect(settings,device_id,get_agent_secret,handler))
+        stopped=asyncio.create_task(stop_event.wait())
         try:
-            await connect_once(settings, device_id, get_access_token, handler)
+            done,_=await asyncio.wait({task,stopped},return_when=asyncio.FIRST_COMPLETED)
+            if stopped in done:
+                task.cancel()
+                await asyncio.gather(task,return_exceptions=True)
+                return
+            stopped.cancel()
+            await asyncio.gather(stopped,return_exceptions=True)
+            await task
             delay=1
         except (PermissionError, ValueError):
             return
         except asyncio.CancelledError:
+            task.cancel()
+            await asyncio.gather(task,return_exceptions=True)
             raise
         except Exception:
-            # Failures are expected on network loss; no tokens or server errors in logs.
+            # Transient network failure; no tokens or raw server errors in logs.
             pass
+        if stop_event.is_set():
+            return
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=delay)
+            await asyncio.wait_for(stop_event.wait(),timeout=delay)
         except asyncio.TimeoutError:
             delay=min(delay*2,60)
