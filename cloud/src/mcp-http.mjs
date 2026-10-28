@@ -2,12 +2,40 @@ import {PUBLIC_TOOLS} from './tool-schemas.mjs';
 import {TOOL_SET} from './relay-protocol.mjs';
 
 export const MCP_VERSION='2025-06-18';
+export const CLOUD_STATUS_TOOL = Object.freeze({
+  name: 'navixx_cloud_connection_status',
+  title: 'NavixX Cloud — verificar conexão',
+  description: 'Use para verificar EXCLUSIVAMENTE o NavixX Desktop Cloud, nunca o conectaX ou NavixX Desktop antigo. Informa se este plugin foi autorizado, se o gateway Cloud está liberado e se o Windows mantém um canal WebSocket ativo. É leitura apenas: não executa comandos no PC nem comprova controle remoto de ponta a ponta.',
+  inputSchema: {type:'object',properties:{},required:[],additionalProperties:false},
+  annotations: {readOnlyHint:true,destructiveHint:false,openWorldHint:false},
+  // This tool is discoverable before OAuth but returns only a login challenge.
+  securitySchemes: [{type:'noauth'},{type:'oauth2',scopes:['navix:control']}],
+});
+export const ADVERTISED_TOOLS = Object.freeze([CLOUD_STATUS_TOOL,...PUBLIC_TOOLS]);
+
+export function authenticationRequired(challenge){
+  if(typeof challenge!=='string'||!challenge.startsWith('Bearer ')){
+    throw new TypeError('Desafio OAuth inválido');
+  }
+  return {isError:true,content:[{type:'text',
+    text:'NavixX Desktop Cloud ainda não autorizado no ChatGPT. Conecte este plugin e confirme o código temporário do PC.'}],
+    _meta:{'mcp/www_authenticate':[challenge+
+      ', error="invalid_token", error_description="Autorize o plugin NavixX Desktop Cloud para continuar"']}};
+}
+
+
 const MAX_INPUT=8*1024*1024;
 const error=(id,code,message)=>({jsonrpc:'2.0',id,error:{code,message}});
 const reply=(id,result)=>({jsonrpc:'2.0',id,result});
-export const MCP_INSTRUCTIONS='Conector MCP do NavixX Desktop para operar meu computador Windows conforme minhas solicitações, com todas as funções disponíveis e autorizadas na sessão: visualizar a tela, controlar mouse e teclado, abrir e operar programas, navegar na web, ler, criar, editar, copiar, mover, transferir e excluir arquivos, além de executar comandos PowerShell, CMD e Python. As ações utilizam os privilégios da conta Windows que executa o NavixX e as permissões habilitadas no aplicativo.';
+export const MCP_INSTRUCTIONS='Este é o NavixX Desktop Cloud, independente do conectaX e do NavixX Desktop antigo. Para perguntas de conexão use primeiro navixx_cloud_connection_status: um canal WebSocket ativo NÃO comprova comando executado no Windows. Para confirmar controle remoto, execute somente a ferramenta status do próprio NavixX Cloud com permissão do titular. Se o serviço não estiver vinculado, explique o bloqueio; nunca substitua silenciosamente pelo conectaX.';
 
 export function validateToolArguments(name,args){
+  if(name===CLOUD_STATUS_TOOL.name){
+    if(!args||typeof args!=='object'||Array.isArray(args)||Object.keys(args).length){
+      throw new Error('Argumentos inválidos para o estado do NavixX Cloud');
+    }
+    return args;
+  }
   const spec=PUBLIC_TOOLS.find(item=>item.name===name);
   if(!spec||!TOOL_SET.has(name))throw new Error('Ferramenta desconhecida');
   if(!args||typeof args!=='object'||Array.isArray(args))throw new Error('Argumentos inválidos');
@@ -28,7 +56,7 @@ export function validateToolArguments(name,args){
   return args;
 }
 
-export async function handleMcp(request,{execute}={}){
+export async function handleMcp(request,{execute,allowRemoteTools=true}={}){
   if(request.method!=='POST')return new Response(null,{status:405,headers:{Allow:'POST'}});
   let body;
   try {
@@ -51,13 +79,17 @@ export async function handleMcp(request,{execute}={}){
     }else if(body.method==='notifications/initialized'){
       return new Response(null,{status:202});
     }else if(body.method==='tools/list'){
-      response=reply(id,{tools:PUBLIC_TOOLS});
+      response=reply(id,{tools:allowRemoteTools?ADVERTISED_TOOLS:[CLOUD_STATUS_TOOL]});
     }else if(body.method==='tools/call'){
       const name=body.params?.name,args=body.params?.arguments??{};
       validateToolArguments(name,args);
+      if(!allowRemoteTools && name!==CLOUD_STATUS_TOOL.name){
+        response=error(id,-32003,'Controle remoto do NavixX Cloud indisponível neste servidor ou dispositivo.');
+      }else{
       const result=await execute(name,args);
       response=reply(id,result&&Array.isArray(result.content)?result:
         {content:[{type:'text',text:JSON.stringify(result)}]});
+      }
     }else{
       response=error(id,-32601,'Método MCP desconhecido');
     }
