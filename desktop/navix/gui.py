@@ -84,6 +84,14 @@ class Panel:
         self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
         self.tunnel_settings = TunnelSettings(directory)
         self.tunnel = TunnelManager(self.session, self.service, self._tunnel_event)
+        # Staging only: never starts cloud access on application launch.
+        self.cloud_controller = None
+        cloud_url = os.environ.get('NAVIX_CLOUD_WSS_URL', '')
+        if cloud_url:
+            from .cloud_controller import CloudController
+            self.cloud_controller = CloudController(
+                directory, self.session, self.service, cloud_url,
+                on_status=lambda status: self.events.put(status))
         self.tunnel_state = tk.StringVar(value='Túnel desligado')
         self._tunnel_worker_running = False
         self._last_tunnel_state = ''
@@ -845,6 +853,8 @@ class Panel:
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
+        if self.cloud_controller:
+            self.cloud_controller.stop()
         self.tunnel.stop()
         self.session.stop()
         self.diagnostics.record('session', 'revoked')
