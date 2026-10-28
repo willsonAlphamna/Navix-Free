@@ -88,19 +88,19 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             device_url(self.settings,'../outra-rota')
 
-    async def test_connect_once_sends_bearer_only_in_header(self):
+    async def test_connect_once_sends_agent_secret_only_in_header(self):
         socket = FakeSocket([call()])
         captured = {}
         def fake_connect(url, **options):
             captured.update({'url':url, **options})
             return socket
-        await connect_once(self.settings,'device_1234567890',lambda: 'a'*32,
+        await connect_once(self.settings,'device_1234567890',lambda: 'a'*43,
                            self.handler,websocket_connect=fake_connect)
-        self.assertEqual(captured['additional_headers']['Authorization'],'Bearer '+'a'*32)
-        self.assertNotIn('a'*32,captured['url'])
+        self.assertEqual(captured['additional_headers']['X-Navix-Agent-Token'],'a'*43)
+        self.assertNotIn('a'*43,captured['url'])
         self.assertTrue(socket.sent[0]['ok'])
 
-    async def test_refuses_missing_oauth_token_before_connect(self):
+    async def test_refuses_missing_agent_token_before_connect(self):
         with self.assertRaises(PermissionError):
             await connect_once(self.settings,'device_1234567890',lambda: '',self.handler,
                                websocket_connect=lambda *a,**kw: None)
