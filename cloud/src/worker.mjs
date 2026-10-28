@@ -220,6 +220,17 @@ export default {
 };
 
 export class DeviceRelay extends DurableObject {
+  constructor(ctx,env){
+    super(ctx,env);
+    // Cloudflare may hibernate a Durable Object while its WebSocket stays
+    // connected. Instance fields (including PendingCalls) do not survive.
+    // Reattach the surviving socket before the next MCP command arrives.
+    const sockets=ctx.getWebSockets();
+    if(sockets.length){
+      this.connectSocket(sockets[0]);
+      for(const stale of sockets.slice(1))stale.close(1000,'Sessão substituída');
+    }
+  }
   get pairing(){return new DurablePairing(this.ctx.storage);}
   get oauth(){return new DeviceOAuth(this.ctx.storage,this.pairing);}
   connectSocket(server){
@@ -301,7 +312,14 @@ export class DeviceRelay extends DurableObject {
         validateToolArguments(command.tool,command.args||{});
         return json({result:await this.calls.call(command.tool,command.args||{},30_000)});
       }
-      catch{return json({error:'Dispositivo sem resposta'},504);}
+      catch(error){
+        const message=String(error?.message||'');
+        const category=message.includes('Tempo limite')?'timeout':
+          message.includes('Falha no dispositivo')?'device_reply_error':
+          message.includes('Falha no envio')?'socket_send_failed':
+          message.includes('Dispositivo desconectado')?'device_disconnected':'relay_error';
+        return json({error:'Dispositivo sem resposta',category},504);
+      }
     }
     if(route==='/connect'){
       if(request.headers.get('upgrade')?.toLowerCase()!=='websocket')return json({error:'Upgrade obrigatório'},426);

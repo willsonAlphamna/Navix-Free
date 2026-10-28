@@ -14,6 +14,7 @@ from .cloud import authorize_cloud_tool
 
 _DEVICE = re.compile(r'^[A-Za-z0-9_-]{16,128}$')
 _CALL_ID = re.compile(r'^[0-9a-f-]{36}$', re.I)
+_MAX_CLOCK_SKEW_MS = 120_000
 _TOOLS = frozenset("""
 browser_back browser_click browser_close_tab browser_download browser_fill
 browser_forward browser_hover browser_navigate browser_open browser_press
@@ -64,7 +65,8 @@ class CloudRequestHandler:
                     tool not in _TOOLS or not isinstance(args, dict) or
                     not isinstance(deadline, (int, float)) or
                     isinstance(deadline, bool) or
-                    not self.clock()*1000 < deadline <= self.clock()*1000+60000):
+                    not self.clock()*1000-_MAX_CLOCK_SKEW_MS < deadline <=
+                    self.clock()*1000+60000+_MAX_CLOCK_SKEW_MS):
                 raise ValueError('Chamada não autorizada ou expirada.')
             authorize_cloud_tool(self.session, tool)
             if tool == 'status':

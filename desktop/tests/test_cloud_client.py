@@ -67,8 +67,19 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result['ok'])
 
     async def test_expired_and_malformed_envelopes(self):
-        for payload in [call(deadline=10), 'not-json', json.dumps([]), 'x'*9_000_000]:
+        for payload in [call(deadline=-150000), call(deadline=185000),
+                        'not-json', json.dumps([]), 'x'*9_000_000]:
             self.assertFalse(json.loads(await self.handler.handle(payload))['ok'])
+
+    async def test_cloud_command_accepts_moderate_windows_clock_skew(self):
+        # Worker timestamps are UTC. The PC can be ~45s behind the edge;
+        # its 30s command deadline would otherwise look >60s in the future.
+        for clock_offset_seconds in (-90, 90):
+            handler = CloudRequestHandler(self.session,
+                                          clock=lambda: 1000+clock_offset_seconds)
+            msg = call(deadline=1030000)
+            result = json.loads(await handler.handle(msg))
+            self.assertTrue(result['ok'],f'Clock offset {clock_offset_seconds}s')
 
     async def test_dispatch_requires_explicit_handler(self):
         result = json.loads(await self.handler.handle(call('files_read', {'path':'x'})))
