@@ -1,6 +1,13 @@
 # NavixX Desktop — pré-lançamento Windows
 
-## NavixX Cloud Preview 0.3.0-alpha.6 — conexão e reparo
+## NavixX Cloud Preview 0.3.0-alpha.7 — vínculo legível e reconexão
+
+Correção observada no Windows: os campos de identificação e código apareciam
+claros/vazios ao entrar no modo somente leitura do Tk. Agora são apresentados
+em rótulos de alto contraste, com botões para copiar e confirmação visual.
+O diálogo mostra quanto tempo falta para o código expirar, informa o próximo
+passo no ChatGPT e esclarece que erro 401 do plugin exige reautorização no
+ChatGPT — o aplicativo não pode contornar o controle de acesso da conta.
 
 Esta edição é instalada separadamente em `%LOCALAPPDATA%\Programs\NavixDesktopCloudPreview`
 e mantém seu perfil próprio em `%LOCALAPPDATA%\NavixDesktopCloudPreview`. Não altera o

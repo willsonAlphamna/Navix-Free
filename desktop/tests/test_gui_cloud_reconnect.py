@@ -63,6 +63,32 @@ class CloudGuiTests(unittest.TestCase):
         service_factory.return_value.start.assert_called_once()
         panel._request_cloud_start.assert_called_once_with(manual=True)
 
+    def test_pairing_dialog_displays_id_and_code_without_invisible_readonly_entry(self):
+        panel=MagicMock()
+        panel.COLORS=Panel.COLORS
+        panel._cloud_pair_dialog=None
+        data={'device_id':'device_1234567890','verification_code':'001234',
+              'expires_at':1_900_000_000_000}
+        with patch('navix.gui.tk.Toplevel'), patch('navix.gui.tk.Frame'), \
+             patch('navix.gui.tk.Label') as label, \
+             patch('navix.gui.tk.Entry') as entry, \
+             patch('navix.gui.tk.StringVar'):
+            Panel._cloud_code_dialog(panel,data)
+        labels=[call.kwargs for call in label.call_args_list]
+        self.assertTrue(any(item.get('text')==data['device_id'] and
+                            item.get('fg')==Panel.COLORS['text'] for item in labels))
+        self.assertTrue(any(item.get('text')==data['verification_code'] and
+                            item.get('fg')==Panel.COLORS['text'] for item in labels))
+        entry.assert_not_called()
+
+    def test_copy_code_confirms_it_was_copied(self):
+        panel=self.panel()
+        feedback=MagicMock()
+        Panel._copy_cloud_value(panel,'001234',feedback)
+        panel.root.clipboard_clear.assert_called_once()
+        panel.root.clipboard_append.assert_called_once_with('001234')
+        self.assertIn('Copiado',feedback.set.call_args.args[0])
+
 
 if __name__=='__main__':
     unittest.main()

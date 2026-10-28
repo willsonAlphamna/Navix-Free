@@ -1,4 +1,4 @@
-#define AppVersion "0.3.0-alpha.6"
+#define AppVersion "0.3.0-alpha.7"
 [Setup]
 AppId={{A8472D5E-3E92-4421-9B37-FC77C8D3F073}
 AppName=NavixX Desktop Cloud Preview

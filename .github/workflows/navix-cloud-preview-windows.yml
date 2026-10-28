@@ -1,7 +1,7 @@
 name: NavixX 0.3 - Windows Cloud Preview (isolado)
 on:
   push:
-    branches: [codex/navixx-cloud-alpha6-reconnect]
+    branches: [codex/navixx-cloud-alpha7-visible-pairing]
     paths: ['desktop/**', '.github/workflows/navix-cloud-preview-windows.yml']
   workflow_dispatch:
 permissions:
@@ -61,7 +61,7 @@ jobs:
       - name: Testar instalacao e desinstalacao sem tocar Navix 0.2.11
         shell: pwsh
         run: |
-          $installer = 'output-cloud-preview\NavixDesktop-CloudPreview-Setup-0.3.0-alpha.6.exe'
+          $installer = 'output-cloud-preview\NavixDesktop-CloudPreview-Setup-0.3.0-alpha.7.exe'
           $install = Start-Process $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalacao do preview falhou' }
           $path = "$env:LOCALAPPDATA\Programs\NavixDesktopCloudPreview"

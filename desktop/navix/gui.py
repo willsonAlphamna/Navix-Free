@@ -919,33 +919,59 @@ class Panel:
         self.show('Pareamento copiado. Cole apenas no cliente MCP autorizado. Não publique a credencial.')
 
     def _cloud_code_dialog(self, data):
+        previous=getattr(self, '_cloud_pair_dialog', None)
+        if previous is not None and previous.winfo_exists():
+            previous.destroy()  # A renewed code invalidates the prior dialog.
         box=tk.Toplevel(self.root)
+        self._cloud_pair_dialog=box
         box.title('NavixX Cloud — código temporário')
         box.configure(bg=self.COLORS['surface'])
-        box.geometry('545x255')
+        box.geometry('580x340')
         box.transient(self.root)
         box.lift()
         self._text(box, 'Vincule seu PC à sua conta ChatGPT', 15, 'bold',
                    self.COLORS['cyan']).pack(pady=(15, 9))
+        feedback=tk.StringVar(value='Use Copiar para transferir os valores sem digitá-los.')
         for name, value in [('ID do computador', data['device_id']),
                             ('Código de 6 dígitos (válido por 2 minutos)', data['verification_code'])]:
             line=tk.Frame(box,bg=self.COLORS['surface'])
             line.pack(fill='x',padx=12,pady=4)
             self._text(line,name,9,color=self.COLORS['subtle']).pack(anchor='w')
-            entry=tk.Entry(line,bg=self.COLORS['surface2'],fg='#ffffff',
-                           insertbackground='#ffffff',font=('Consolas',11))
-            entry.pack(side='left',fill='x',expand=True)
-            entry.insert(0,value)
-            entry.configure(state='readonly')
-            self._button(line,'Copiar',lambda value=value:self._copy_cloud_value(value)).pack(
+            # Windows Tk changes a readonly Entry's background to system white,
+            # leaving its white foreground invisible. An ordinary Label keeps
+            # the exact colors across Windows themes; copying is explicit.
+            display=tk.Label(line,text=value,bg=self.COLORS['surface2'],
+                             fg=self.COLORS['text'],font=('Consolas',11),
+                             anchor='w',padx=12,pady=9)
+            display.pack(side='left',fill='x',expand=True)
+            self._button(line,'Copiar',lambda value=value:
+                         self._copy_cloud_value(value,feedback)).pack(
                 side='left',padx=(7,0))
-        self._text(box, 'Insira o ID e o código na página de autorização do NavixX. '
-                   'Nunca envie o segredo interno do dispositivo.', 9,
-                   color=self.COLORS['subtle'],wraplength=510).pack(pady=8)
+        tk.Label(box,textvariable=feedback,bg=self.COLORS['surface'],
+                 fg=self.COLORS['green'],font=('Segoe UI',9)).pack(pady=(7,2))
+        self._text(box, 'No ChatGPT, conecte o plugin NavixX Cloud. Na página de autorização, '
+                   'cole o ID e o código e confirme. Se o plugin negar acesso (401), '
+                   'reautorize-o no ChatGPT; o PC não pode conceder essa permissão sozinho.',
+                   9,color=self.COLORS['subtle'],wraplength=545).pack(pady=4)
+        countdown=tk.StringVar(value='Código válido por até 2 minutos.')
+        tk.Label(box,textvariable=countdown,bg=self.COLORS['surface'],
+                 fg=self.COLORS['cyan'],font=('Segoe UI',9,'bold')).pack(pady=(3,2))
 
-    def _copy_cloud_value(self,value):
+        def refresh_countdown():
+            if not box.winfo_exists():
+                return
+            remaining=max(0,int((data['expires_at']-time.time()*1000+999)//1000))
+            countdown.set(f'Código válido por {remaining}s.' if remaining else
+                          'Código expirado. Clique em Vincular ao ChatGPT para gerar outro.')
+            if remaining:
+                box.after(1000,refresh_countdown)
+        box.after(0,refresh_countdown)
+
+    def _copy_cloud_value(self,value,feedback=None):
         self.root.clipboard_clear()
         self.root.clipboard_append(value)
+        if feedback is not None:
+            feedback.set('Copiado! Cole no formulário de autorização do ChatGPT.')
 
     def enroll_cloud(self):
         if not self.cloud_controller:
