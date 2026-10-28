@@ -90,3 +90,33 @@ test('não aceita ID curto, código não numérico nem token fraco',async()=>{
     {deviceId,code,agentSecret:'short'},
   ]) await assert.rejects(pair.start(bad));
 });
+
+test('repetir aprovação depois de vinculado é recusado',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  await assert.rejects(pair.approve({ownerId:ownerA,deviceId,code}),/não encontrado/);
+});
+test('mesmo código com identificador adulterado não vincula dispositivo',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  await assert.rejects(pair.approve({ownerId:ownerA,deviceId:'device_WRONGabcdefgh',code}),/não encontrado/);
+  assert.equal(await pair.verifyOwner(ownerA),false);
+});
+test('revogado não pode reutilizar segredo antigo em novo pareamento',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  await pair.revoke({ownerId:ownerA});
+  await pair.start({deviceId,code,agentSecret:another});
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  assert.equal(await pair.verifyAgent(secret),false);
+  assert.equal(await pair.verifyAgent(another),true);
+});
+test('status de token correto só confirma pareamento depois da aprovação',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  assert.deepEqual(await pair.status({deviceId,agentSecret:secret}),{linked:false});
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  assert.deepEqual(await pair.status({deviceId,agentSecret:secret}),{linked:true});
+});
