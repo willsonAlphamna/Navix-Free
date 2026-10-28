@@ -93,7 +93,7 @@ async def connect_once(settings, device_id, get_agent_secret, handler, websocket
     token = get_access_token()
     if inspect.isawaitable(token):
         token = await token
-    if not isinstance(token, str) or not 20 <= len(token) <= 8192 or any(c.isspace() for c in token):
+    if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43,128}', token):
         raise PermissionError('Credencial do dispositivo indisponível.')
     async with websocket_connect(endpoint, additional_headers={'X-Navix-Agent-Token': token},
                                  max_size=12*1024*1024, open_timeout=15, ping_interval=20) as ws:
