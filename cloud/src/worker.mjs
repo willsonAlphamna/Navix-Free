@@ -62,7 +62,7 @@ export default {
   async fetch(request,env) {
     const url=new URL(request.url);
     if(url.pathname==='/healthz' && request.method==='GET'){
-      return json({service:'navixx-cloud',version:'0.3.0-alpha.4',
+      return json({service:'navixx-cloud',version:'0.3.0-alpha.8',
         public_tools_enabled:publicControlEnabled(env),
         restricted_to_canary:Boolean(env.NAVIX_TEST_DEVICE_ID)});
     }
@@ -119,7 +119,8 @@ export default {
       } catch{return json({error:'invalid_grant'},400);}
     }
     if(url.pathname==='/mcp'){
-      if(!publicControlEnabled(env))return json({error:'Controle remoto público em validação'},503);
+      // OAuth must be discoverable even while remote control is disabled.
+      // A connection check can then tell the user the real cause of a block.
       let identity;
       try{identity=await authorizedDevice(request,env);}
       catch {
@@ -127,16 +128,32 @@ export default {
           headers:{'content-type':'application/json','cache-control':'no-store',
             'www-authenticate':challengeFor(request)}});
       }
-      if(!deviceControlAllowed(env,identity.deviceId)){
-        return json({error:'Dispositivo fora do piloto autorizado'},403);
-      }
-      return handleMcp(request,{execute:async (tool,args)=>{
-        const response=await stubFor(env,identity.deviceId).fetch(new Request(
-          'https://device.local/execute',{method:'POST',headers:{
-            'content-type':'application/json','x-navix-owner':identity.ownerId},
-            body:JSON.stringify({tool,args}),
+      const canControl=deviceControlAllowed(env,identity.deviceId);
+      return handleMcp(request,{allowRemoteTools:canControl,execute:async (tool,args)=>{
+        const stub=stubFor(env,identity.deviceId);
+        if(tool==='navixx_cloud_connection_status'){
+          const response=await stub.fetch(new Request('https://device.local/status',{
+            headers:{'x-navix-owner':identity.ownerId},
           }));
-        if(!response.ok)throw new Error('Computador indisponível');
+          // Never confuse the transport handshake with a successful PC command.
+          const online=response.ok&&Boolean((await response.json()).connected);
+          return {plugin:'navixx-cloud',authorized:true,paired:true,
+            cloud_control_enabled:canControl,windows_channel_active:online,
+            windows_command_verified:false,
+            next_step:!canControl?'Controle remoto ainda não autorizado neste gateway/dispositivo.':
+              !online?'Abra o NavixX Desktop Cloud e autorize a sessão local; o canal remoto precisa conectar.':
+              'Canal ativo. Para comprovar execução real no Windows, use a ferramenta status DESTE plugin.'};
+        }
+        if(!canControl)throw new Error('Controle remoto não autorizado neste dispositivo');
+        const response=await stub.fetch(new Request('https://device.local/execute',{
+          method:'POST',headers:{'content-type':'application/json','x-navix-owner':identity.ownerId},
+          body:JSON.stringify({tool,args}),
+        }));
+        if(!response.ok){
+          const failure=await response.json().catch(()=>({}));
+          return {isError:true,content:[{type:'text',text:'NavixX Cloud: o Windows não respondeu à ferramenta ('+
+            String(failure.category||'indisponível')+'). Use navixx_cloud_connection_status.'}]};
+        }
         const body=await response.json();
         return body.result;
       }});
@@ -310,7 +327,7 @@ export class DeviceRelay extends DurableObject {
       }
       try{
         validateToolArguments(command.tool,command.args||{});
-        return json({result:await this.calls.call(command.tool,command.args||{},30_000)});
+        return json({result:await this.calls.call(command.tool,command.args||{},command.tool==='status'?8000:30_000)});
       }
       catch(error){
         const message=String(error?.message||'');

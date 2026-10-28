@@ -1,7 +1,7 @@
 name: NavixX Cloud - testes de isolamento
 on:
   push:
-    branches: [codex/navixx-cloud-v0_3-foundation]
+    branches: [codex/navixx-cloud-v0_3-foundation, codex/navixx-cloud-audit-alpha8]
     paths: ['cloud/**', 'desktop/navix/browser.py', 'desktop/navix/gui.py', 'desktop/navix/cloud*.py', 'desktop/tests/test_browser_actions.py', 'desktop/tests/test_cloud*.py', 'desktop/requirements.txt', '.github/workflows/navix-cloud.yml']
   pull_request:
     paths: ['cloud/**', '.github/workflows/navix-cloud.yml']
