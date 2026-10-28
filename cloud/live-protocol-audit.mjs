@@ -25,9 +25,19 @@ assert.equal(authInfo.token_endpoint,origin+'/oauth/token');
 assert.equal(authInfo.client_id_metadata_document_supported,true);
 const challenge=await read('/mcp',{method:'POST',headers:{'content-type':'application/json'},
   body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}})});
-assert.equal(challenge.status,401,
-  'Sem credencial a rota MCP precisa pedir OAuth (401), nunca 503 silencioso: status '+challenge.status);
-assert.match(challenge.headers.get('www-authenticate')||'',/Bearer resource_metadata=/);
+if(challenge.status===401){
+  // Old staging still requires OAuth before tools/list; alpha.8 deployment is pending.
+  assert.match(challenge.headers.get('www-authenticate')||'',/Bearer resource_metadata=/);
+  console.warn('STAGING AINDA ANTIGO: resposta 401 antes da descoberta das ferramentas; versão mista NÃO implantada.');
+}else{
+  assert.equal(challenge.status,200,'O MCP deve responder 200 à inicialização anônima ou usar desafio OAuth 401');
+  const init=await challenge.json();
+  assert.equal(init.result.serverInfo.name,'NavixX Cloud');
+  const catalog=await read('/mcp',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:2,method:'tools/list'})});
+  assert.equal(catalog.status,200);
+  assert.ok((await catalog.json()).result.tools.some(x=>x.name==='navixx_cloud_connection_status'));
+}
 const query=new URLSearchParams({
   client_id:CLIENT_ID,redirect_uri:CALLBACK,response_type:'code',code_challenge:'a'.repeat(43),
   code_challenge_method:'S256',state:'navix-read-only-audit',scope:SCOPE,resource:origin});

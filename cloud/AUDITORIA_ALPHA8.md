@@ -29,3 +29,6 @@ O fluxo de CI faz testes sem credenciais contra o servidor de staging para valid
 
 ## Fluxo de primeiro acesso do Windows
 Após o proprietário clicar uma vez em **Conectar / Autorizar**, o cliente tenta a reconexão. Caso o dispositivo não esteja vinculado, o programa abre automaticamente o formulário de ID/código. A confirmação OAuth **deve** ser feita pelo titular no ChatGPT; não existe API legítima que o programa possa acionar para conceder consentimento sem ele.
+
+## Descoberta OAuth sem navegar por menus
+O plugin declarou `auth.type: mixed` e permite `initialize`/`tools/list` sem autenticação, mas não executa ferramentas Windows sem credencial OAuth verificada. A chamada sem token recebe `result._meta['mcp/www_authenticate']` com `invalid_token`/`error_description`, conforme documentação da OpenAI. O modo misto reduz a chance de o ChatGPT ignorar o plugin sem vínculo e escolher outro com ferramenta `status`. O suporte deve ser confirmado depois de publicar o novo Worker e atualizar o plugin instalado; não existe garantia de escolha absoluta de ferramentas pelo modelo.

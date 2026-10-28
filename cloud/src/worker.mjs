@@ -3,7 +3,7 @@ import {DurablePairing} from './durable-pairing.mjs';
 import {PendingCalls,TOOL_SET} from './relay-protocol.mjs';
 import {DeviceOAuth,authMetadata,authorizationParams,htmlResponse,oauthRedirect,
   pairingPage,parseForm,resourceFor,splitCredential,CLIENT_ID,CALLBACK,SCOPE} from './device-oauth.mjs';
-import {handleMcp,validateToolArguments} from './mcp-http.mjs';
+import {handleMcp,validateToolArguments,authenticationRequired} from './mcp-http.mjs';
 
 const DEVICE = /^[A-Za-z0-9_-]{16,128}$/;
 const json = (body,status=200) => new Response(JSON.stringify(body),{
@@ -124,9 +124,11 @@ export default {
       let identity;
       try{identity=await authorizedDevice(request,env);}
       catch {
-        return new Response(JSON.stringify({error:'Não autorizado'}),{status:401,
-          headers:{'content-type':'application/json','cache-control':'no-store',
-            'www-authenticate':challengeFor(request)}});
+        // Mixed OAuth: expose the MCP catalog without credentials so ChatGPT
+        // can choose the NavixX Cloud tool, and let tool-level OAuth prompt
+        // the user. NEVER call a device or return private status anonymously.
+        return handleMcp(request,{allowRemoteTools:publicControlEnabled(env),
+          execute:async ()=>authenticationRequired(challengeFor(request))});
       }
       const canControl=deviceControlAllowed(env,identity.deviceId);
       return handleMcp(request,{allowRemoteTools:canControl,execute:async (tool,args)=>{

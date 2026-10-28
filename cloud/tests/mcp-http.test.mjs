@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {handleMcp,MCP_INSTRUCTIONS,validateToolArguments,CLOUD_STATUS_TOOL} from '../src/mcp-http.mjs';
+import {handleMcp,MCP_INSTRUCTIONS,validateToolArguments,CLOUD_STATUS_TOOL,authenticationRequired} from '../src/mcp-http.mjs';
 import {PUBLIC_TOOLS} from '../src/tool-schemas.mjs';
 
 const request=(method,params={})=>new Request('https://navix.test/mcp',{
@@ -77,4 +77,20 @@ test('gateway desabilitado mantém OAuth MCP e expõe apenas diagnóstico, nunca
   assert.equal(refused.error.code,-32003);
   const diagnostic=await run('tools/call',{name:'navixx_cloud_connection_status',arguments:{}});
   assert.equal(JSON.parse(diagnostic.result.content[0].text).cloud_control_enabled,false);
+});
+
+test('sem vínculo ChatGPT descobre o status Cloud e recebe desafio OAuth tool-level, nunca acessa Windows',async()=>{
+  assert.deepEqual(CLOUD_STATUS_TOOL.securitySchemes.map(x=>x.type),['noauth','oauth2']);
+  const challenge='Bearer resource_metadata="https://navix.test/.well-known/oauth-protected-resource", scope="navix:control"';
+  const catalog=await handleMcp(request('tools/list'),{
+    execute:async()=>{throw Error('Sem ferramentas durante tools/list');}});
+  const listed=await catalog.json();
+  assert.ok(listed.result.tools.some(x=>x.name==='navixx_cloud_connection_status'));
+  const response=await handleMcp(request('tools/call',{name:'navixx_cloud_connection_status',arguments:{}}),{
+    execute:async()=>authenticationRequired(challenge)});
+  const body=await response.json();
+  assert.equal(body.result.isError,true);
+  assert.match(body.result._meta['mcp/www_authenticate'][0],/error="invalid_token"/);
+  assert.match(body.result._meta['mcp/www_authenticate'][0],/error_description=/);
+  assert.match(body.result.content[0].text,/não autorizado/);
 });

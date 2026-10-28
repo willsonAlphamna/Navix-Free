@@ -8,9 +8,20 @@ export const CLOUD_STATUS_TOOL = Object.freeze({
   description: 'Use para verificar EXCLUSIVAMENTE o NavixX Desktop Cloud, nunca o conectaX ou NavixX Desktop antigo. Informa se este plugin foi autorizado, se o gateway Cloud está liberado e se o Windows mantém um canal WebSocket ativo. É leitura apenas: não executa comandos no PC nem comprova controle remoto de ponta a ponta.',
   inputSchema: {type:'object',properties:{},required:[],additionalProperties:false},
   annotations: {readOnlyHint:true,destructiveHint:false,openWorldHint:false},
-  securitySchemes: [{type:'oauth2',scopes:['navix:control']}],
+  // This tool is discoverable before OAuth but returns only a login challenge.
+  securitySchemes: [{type:'noauth'},{type:'oauth2',scopes:['navix:control']}],
 });
 export const ADVERTISED_TOOLS = Object.freeze([CLOUD_STATUS_TOOL,...PUBLIC_TOOLS]);
+
+export function authenticationRequired(challenge){
+  if(typeof challenge!=='string'||!challenge.startsWith('Bearer ')){
+    throw new TypeError('Desafio OAuth inválido');
+  }
+  return {isError:true,content:[{type:'text',
+    text:'NavixX Desktop Cloud ainda não autorizado no ChatGPT. Conecte este plugin e confirme o código temporário do PC.'}],
+    _meta:{'mcp/www_authenticate':[challenge+
+      ', error="invalid_token", error_description="Autorize o plugin NavixX Desktop Cloud para continuar"']}};
+}
 
 
 const MAX_INPUT=8*1024*1024;
