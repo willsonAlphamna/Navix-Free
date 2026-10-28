@@ -137,6 +137,11 @@ def test_browser_recovers_after_last_tab_closes(real_browser):
     new_page = browser.call('open', url=url)['id']
     assert new_page in {tab['id'] for tab in browser.call('tabs')}
     assert 'Próxima' in browser.call('read', page_id=new_page)
+    # Also simulate Chromium/context termination while Python state survives.
+    browser.worker.submit(browser.context.close).result(timeout=10)
+    recovered = browser.call('open', url=url)['id']
+    assert recovered in {tab['id'] for tab in browser.call('tabs')}
+    assert 'Próxima' in browser.call('read', page_id=recovered)
 
 
 def test_real_download_transfer_deadline(real_browser, tmp_path):
