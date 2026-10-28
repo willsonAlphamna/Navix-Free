@@ -20,3 +20,7 @@ jobs:
         working-directory: cloud
       - run: npm test
         working-directory: cloud
+
+      - name: Verificar pacote Cloudflare sem publicar
+        run: npx wrangler deploy --dry-run
+        working-directory: cloud
