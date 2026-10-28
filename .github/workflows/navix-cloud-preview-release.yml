@@ -12,30 +12,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Recuperar pacote do plugin do repositório
+        uses: actions/checkout@v4
       - name: Recuperar artefato aprovado no Windows
         uses: actions/download-artifact@v4
         with:
           name: NavixX-0.3-CloudPreview-Windows
-          run-id: 40630152433
+          run-id: 40633942931
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: release
       - name: Validar instalador, autoteste e SHA-256
         shell: bash
         run: |
           set -euo pipefail
-          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.3.exe'
+          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.4.exe'
           test -s "$installer"
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
           expected="$(sha256sum "$installer" | cut -d ' ' -f 1)"
           grep -qi "$expected" release/SHA256.txt
+          test -s NavixX_ChatGPT_Plugin_0.3.zip
+          unzip -t NavixX_ChatGPT_Plugin_0.3.zip
+          cp NavixX_ChatGPT_Plugin_0.3.zip release/
       - name: Publicar pré-lançamento claramente identificado
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navixx-cloud-v0.3.0-alpha.3-preview release/* \
+          gh release create navixx-cloud-v0.3.0-alpha.4-preview release/* \
             --target '${{ github.sha }}' --prerelease --latest=false \
-            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.3 (Windows)' \
-            --notes 'VERSÃO DE TESTE NÃO ASSINADA. Inclui instalador independente que preserva o NavixX 0.2.11 e perfis separados. Testes Windows, instalador e desinstalador passaram na execução GitHub Actions 40630152433. O servidor Cloudflare de testes funciona para pareamento, OAuth e WebSocket simulado, mas o controle remoto público permanece DESATIVADO. A integração ChatGPT e a execução de comandos em Windows real não foram aprovadas para uso público; não distribuir como produto final. O usuário deve conceder permissões localmente e autorizar seu próprio dispositivo no ChatGPT. Documentação e código: pull request #13.'
+            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.4 (Windows)' \
+            --notes 'VERSÃO DE TESTE NÃO ASSINADA. Preserva o NavixX 0.2.11 e dados originais por instalar em caminho e perfil separados. Testes de Python, Windows, empacotamento, instalador e desinstalador passaram na execução GitHub Actions 40633942931. A Cloudflare passou no teste sintético de pareamento, OAuth, WebSocket, execução MCP remota e revogação, com controle restrito ao dispositivo de teste; o controle de Windows real e a distribuição no catálogo público do ChatGPT dependem de validação adicional e aprovação da plataforma. Inclui ZIP do plugin para revisão/upload pelo proprietário. Não distribuir como produto final antes da conclusão dos testes e revisão. Documentação e código: pull request #13.'
