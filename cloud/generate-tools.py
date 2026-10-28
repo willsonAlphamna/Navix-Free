@@ -58,7 +58,7 @@ def main():
             'annotations': {'readOnlyHint': read_only, 'destructiveHint': destructive,
                             'openWorldHint': name.startswith(('browser_', 'command_'))
                             or name == 'files_download'},
-            '_meta': {'securitySchemes': [{'type': 'oauth2', 'scopes': ['navix:control']}]},
+            'securitySchemes': [{'type': 'oauth2', 'scopes': ['navix:control']}],
         })
     if len(tools) != 44:
         raise ValueError(f'Expected 44 tools, got {len(tools)}')

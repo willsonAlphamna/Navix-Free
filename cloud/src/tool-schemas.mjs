@@ -15,16 +15,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_tabs",
@@ -41,16 +39,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_open",
@@ -73,16 +69,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_read",
@@ -105,16 +99,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_click",
@@ -145,16 +137,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_fill",
@@ -189,16 +179,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_scroll",
@@ -225,16 +213,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_screenshot",
@@ -257,16 +243,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_screenshot",
@@ -283,16 +267,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_click",
@@ -327,16 +309,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_type",
@@ -359,16 +339,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_key",
@@ -391,16 +369,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_scroll",
@@ -423,16 +399,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_position",
@@ -449,16 +423,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_screen_info",
@@ -475,16 +447,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_move",
@@ -515,16 +485,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_drag",
@@ -559,16 +527,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "desktop_hotkey",
@@ -594,16 +560,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_start",
@@ -625,16 +589,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_navigate",
@@ -661,16 +623,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_close_tab",
@@ -693,16 +653,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_back",
@@ -725,16 +683,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_forward",
@@ -757,16 +713,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_reload",
@@ -789,16 +743,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_snapshot",
@@ -821,16 +773,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_select",
@@ -868,16 +818,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_press",
@@ -912,16 +860,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_hover",
@@ -952,16 +898,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_wait",
@@ -1000,16 +944,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_upload",
@@ -1043,16 +985,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "browser_download",
@@ -1091,16 +1031,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_list",
@@ -1127,16 +1065,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_read",
@@ -1163,16 +1099,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_write",
@@ -1203,16 +1137,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_edit",
@@ -1247,16 +1179,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_mkdir",
@@ -1283,16 +1213,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_copy",
@@ -1323,16 +1251,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_move",
@@ -1363,16 +1289,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_delete",
@@ -1399,16 +1323,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_read_binary",
@@ -1435,16 +1357,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_write_binary",
@@ -1475,16 +1395,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": false
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "files_download",
@@ -1523,16 +1441,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": false,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "command_run",
@@ -1567,16 +1483,14 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   },
   {
     "name": "command_exec",
@@ -1610,15 +1524,13 @@ export const PUBLIC_TOOLS = Object.freeze([
       "destructiveHint": true,
       "openWorldHint": true
     },
-    "_meta": {
-      "securitySchemes": [
-        {
-          "type": "oauth2",
-          "scopes": [
-            "navix:control"
-          ]
-        }
-      ]
-    }
+    "securitySchemes": [
+      {
+        "type": "oauth2",
+        "scopes": [
+          "navix:control"
+        ]
+      }
+    ]
   }
 ]);

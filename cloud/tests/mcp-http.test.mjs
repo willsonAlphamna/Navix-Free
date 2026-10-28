@@ -18,7 +18,7 @@ test('expõe 44 ferramentas com schemas reais sem argumentos arbitrários',()=>{
     assert.equal(tool.inputSchema.type,'object');
     assert.equal(tool.inputSchema.additionalProperties,false);
     assert.ok(tool.description);
-    assert.deepEqual(tool._meta.securitySchemes[0].scopes,['navix:control']);
+    assert.deepEqual(tool.securitySchemes,[{type:'oauth2',scopes:['navix:control']}]);
   }
   assert.match(MCP_INSTRUCTIONS,/Conector MCP do NavixX Desktop/);
 });

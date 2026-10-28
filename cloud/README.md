@@ -1,8 +1,9 @@
-# NavixX Cloud 0.3.0-alpha.2 — fundação multiusuário
+# NavixX Cloud 0.3.0-alpha.3 — piloto isolado
 
-**Estado: desenvolvimento. NÃO é um instalador pronto e NÃO existe ainda um plugin
-público funcionando.** O NavixX Desktop 0.2.11 do proprietário permanece intocado.
-Não anunciar, distribuir ou enviar por e-mail a versão 0.3 como produto final.
+**Estado: pré-lançamento técnico. Ainda não existe plugin público funcionando.**
+O NavixX Desktop 0.2.11 permanece intacto. O servidor de testes responde em
+https://navixx-cloud-staging.navixx-alfamna.workers.dev/healthz, mas `/mcp`
+continua desativado (503). Não anunciar a versão 0.3 como produto final.
 
 ## Objetivo
 
@@ -21,24 +22,29 @@ consentimento pessoal não pode ser ignorada por instalador algum.
 - **Pareamento no backend:** código de seis dígitos (120 segundos), cinco
   tentativas, SHA-256 dos códigos/segredos, dispositivo por dono verificado,
   persistência isolada em Durable Object SQLite e revogação.
-- **OAuth:** validação JWT com JWKS, emissor, público-alvo, prazo, escopo
-  `navix:control` e recurso protegido RFC 9728. Necessita IdP real configurado.
+- **OAuth:** servidor OAuth 2.1 próprio, fluxo authorization-code com PKCE S256,
+  metadados de descoberta, código do dispositivo exibido pelo Windows, tokens
+  individuais, renovação e revogação. O fluxo real no ChatGPT ainda requer teste.
 - **Canal WebSocket:** segregação por dispositivo, substituição de sessão,
   limite de tamanho, identificação de respostas, cancelamento em desconexão e
   bloqueio de chamadas simultâneas conflitantes.
 - **Windows opcional:** cliente WebSocket com reconexão limitada, verificação da
-  sessão local em cada chamada, ponte para o servidor FastMCP em 127.0.0.1,
-  revogação que cancela imediatamente o WebSocket e controlador que só liga por
-  ação explícita. Por enquanto requer URL de staging configurada e **não inicia
-  sozinho**. O instalador 0.2.11 continua usando o túnel anterior.
+  sessão local em cada chamada, ponte para FastMCP em 127.0.0.1 e controlador
+  que só liga por ação explícita. O painel tem os botões **Vincular ao ChatGPT**
+  e **Reconectar nuvem**. O instalador de preview 0.3 usa diretório, identidade
+  e perfil próprios, sem substituir o NavixX 0.2.11.
+- **MCP real:** rota Streamable HTTP com inicialização, catálogo das 44 ferramentas,
+  validação de entradas e encaminhamento via WebSocket, ainda bloqueada no
+  servidor público até a validação de execução no Windows e revisão de risco.
+- **Implantação:** Cloudflare Worker com Durable Objects SQLite provisionado,
+  autenticação, pareamento, WebSocket e revogação testados ao vivo usando um
+  dispositivo simulado. 51 testes Node passaram na branch de desenvolvimento.
 - **Catálogo preservado:** descrição original do plugin `conectaX` e nomes
   das 44 ferramentas em `MCP_CATALOG.md`.
 
 **Segurança: a rota `/mcp` permanece bloqueada (503) mesmo com token OAuth.**
-A rota interna experimental `/api/device/execute` permite **somente `status`**
-do dispositivo previamente pareado. Mouse, arquivos e comandos remotos ainda
-não são liberados pelo gateway público. Não trate testes de unidade como
-prova de acesso remoto ponta a ponta.
+Mouse, arquivos e comandos remotos não estão liberados pelo gateway público.
+Os testes de pareamento e transporte não constituem prova de execução remota no Windows.
 
 ## Execução local de testes
 
@@ -47,7 +53,9 @@ prova de acesso remoto ponta a ponta.
 - Windows em `desktop/`: instalar `requirements.txt`, executar
   `python -m pytest -q tests/test_cloud*.py tests/test_browser_actions.py
   tests/test_browser_real.py`
-- GitHub Actions: `.github/workflows/navix-cloud.yml`
+- Testes ao vivo seguros: `NAVIX_LIVE_STAGING_URL=https://navixx-cloud-staging.navixx-alfamna.workers.dev node live-smoke.mjs`
+- GitHub Actions: `.github/workflows/navix-cloud.yml` e
+  `.github/workflows/navix-cloud-preview-windows.yml`.
 
 ## Escolha da infraestrutura
 
@@ -66,19 +74,18 @@ Documentações:
 - https://developers.openai.com/plugins/build/mcp-server
 - https://developers.openai.com/plugins/build/auth
 
-## Impedimentos reais para a versão instalável
+## Pendências antes da publicação pública
 
-1. Provisionar a conta do projeto no serviço Cloudflare. O cadastro na sessão
-   de navegador atual exibiu bloqueio de verificação de segurança; não o contornar.
-2. Configurar um provedor OAuth 2.1/OIDC confiável que aceite clientes ChatGPT
-   com PKCE/CIMD ou DCR. Nenhuma senha universal ou login falso.
-3. Concluir página autenticada para aprovar/revogar pareamento e selecionar
-   dispositivo padrão de cada dono; testar dois donos em computadores reais.
-4. Implementar e auditar o MCP Streamable HTTP completo, encaminhando as 44
-   ferramentas com autorização granular e aprovação contextual de ações sensíveis.
-5. Finalizar assistente visual de instalação, domínio público, teste integral
-   no Windows e revisão/publicação do plugin; só então produzir o instalador 0.3
-   e enviar o link por e-mail.
+1. Comprovar as chamadas remotas com um Windows real e consentimento explícito,
+   incluindo revogação, expiração e limites por ferramenta.
+2. Revisar o risco das ferramentas de arquivo e PowerShell e limitar tentativas
+   e criação de dispositivos para não gerar custos ou abuso público.
+3. Conectar o OAuth na interface real de plugins do ChatGPT; obter revisão e
+   publicar o conector único. Os usuários ainda precisarão consentir na conta.
+4. Acompanhar a compilação/instalação/desinstalação do instalador isolado e
+   disponibilizar um binário testado (não assinado, com SHA-256).
+5. Para vários PCs da mesma conta ChatGPT, criar seletor de dispositivos e
+   autenticação de titular independente de cada computador.
 
 **Não ativar `/mcp` por simples remoção do 503:** isso exporia execução de
 comandos sem os pré-requisitos de segurança acima.
