@@ -97,6 +97,7 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         await connect_once(self.settings,'device_1234567890',lambda: 'a'*43,
                            self.handler,websocket_connect=fake_connect)
         self.assertEqual(captured['additional_headers']['X-Navix-Agent-Token'],'a'*43)
+        self.assertEqual(captured['user_agent_header'],'NavixX-Desktop-Cloud/0.3.0')
         self.assertNotIn('a'*43,captured['url'])
         self.assertTrue(socket.sent[0]['ok'])
 

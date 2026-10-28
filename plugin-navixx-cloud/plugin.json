@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "navixx-cloud",
+  "version": "0.3.0",
+  "description": "Conector MCP do NavixX Desktop para operar meu computador Windows conforme minhas solicitações, com todas as funções disponíveis e autorizadas na sessão: visualizar a tela, controlar mouse e teclado, abrir e operar programas, navegar na web, ler, criar, editar, copiar, mover, transferir e excluir arquivos, além de executar comandos PowerShell, CMD e Python. As ações utilizam os privilégios da conta Windows que executa o NavixX e as permissões habilitadas no aplicativo.",
+  "author": {
+    "name": "ALFAMNA",
+    "url": "https://github.com/willsonAlphamna/Navix-Free"
+  },
+  "homepage": "https://github.com/willsonAlphamna/Navix-Free",
+  "repository": "https://github.com/willsonAlphamna/Navix-Free",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "NavixX Desktop Cloud",
+        "shortDescription": "Controle seu Windows pelo ChatGPT com permissões locais, OAuth e revogação.",
+        "longDescription": "Conector MCP do NavixX Desktop para operar meu computador Windows conforme minhas solicitações, com todas as funções disponíveis e autorizadas na sessão: visualizar a tela, controlar mouse e teclado, abrir e operar programas, navegar na web, ler, criar, editar, copiar, mover, transferir e excluir arquivos, além de executar comandos PowerShell, CMD e Python. As ações utilizam os privilégios da conta Windows que executa o NavixX e as permissões habilitadas no aplicativo.",
+        "developerName": "ALFAMNA",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/willsonAlphamna/Navix-Free",
+        "logo": "./assets/logo.png",
+        "composerIcon": "./assets/logo.png"
+      }
+    }
+  }
+}

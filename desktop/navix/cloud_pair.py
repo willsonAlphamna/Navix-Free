@@ -86,6 +86,9 @@ class PairingHttpClient:
             data=json.dumps(body).encode('utf-8') if body is not None else None,
             headers={
                 'Accept': 'application/json',
+                # Cloudflare workers.dev rejects Python-urllib's default
+                # signature with HTTP 403 / error 1010.
+                'User-Agent': 'NavixX-Desktop-Cloud/0.3.0',
                 **({'Content-Type':'application/json'} if body is not None else {}),
                 **({'X-Navix-Agent-Token':agent_secret} if agent_secret else {}),
             }, method='POST' if body is not None else 'GET')

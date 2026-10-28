@@ -1,0 +1,19 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "navixx-cloud": {
+      "type": "streamable-http",
+      "url": "https://navixx-cloud-staging.navixx-alfamna.workers.dev/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {"mode": "cimd"},
+            "resource": "https://navixx-cloud-staging.navixx-alfamna.workers.dev",
+            "baseScopes": ["navix:control"]
+          }
+        }
+      }
+    }
+  }
+}
