@@ -43,10 +43,11 @@ def device_url(settings, device_id):
 class CloudRequestHandler:
     """Handles bounded RPC frames, rechecking live Windows permissions each time."""
 
-    def __init__(self, session, invoke=None, clock=time.time):
+    def __init__(self, session, invoke=None, clock=time.time, on_success=None):
         self.session = session
         self.invoke = invoke
         self.clock = clock
+        self.on_success = on_success
 
     async def handle(self, frame):
         call_id = ''
@@ -77,6 +78,11 @@ class CloudRequestHandler:
                 result = self.invoke(tool, args)
                 if inspect.isawaitable(result):
                     result = await result
+            if self.on_success:
+                try:
+                    self.on_success(tool)
+                except Exception:
+                    pass
             return json.dumps({'kind': 'result', 'id': call_id, 'ok': True,
                                'result': result}, ensure_ascii=False)
         except Exception:
@@ -87,7 +93,8 @@ class CloudRequestHandler:
                                'ok': False, 'error': 'Operação recusada ou indisponível.'})
 
 
-async def connect_once(settings, device_id, get_agent_secret, handler, websocket_connect=None):
+async def connect_once(settings, device_id, get_agent_secret, handler, websocket_connect=None,
+                       on_connected=None):
     """Connect only with device-specific random secret; no runtime/API key creation."""
     if websocket_connect is None:
         from websockets.asyncio.client import connect as websocket_connect
@@ -100,41 +107,73 @@ async def connect_once(settings, device_id, get_agent_secret, handler, websocket
     async with websocket_connect(endpoint, additional_headers={'X-Navix-Agent-Token': token},
                                  user_agent_header='NavixX-Desktop-Cloud/0.3.0',
                                  max_size=12*1024*1024, open_timeout=15, ping_interval=20) as ws:
+        if on_connected:
+            on_connected()
         async for frame in ws:
             await ws.send(await handler.handle(frame))
 
 
 async def run_until_stopped(settings, device_id, get_agent_secret, handler, stop_event,
-                            connect=connect_once):
-    """Stop cancels the LIVE WebSocket immediately, not only the retry delay."""
+                            connect=connect_once, on_state=None):
+    """Retry network failures; report visible states without exposing secrets.
+
+    An owner-revoked/expired local session and invalid device credentials are
+    terminal. Transient network errors retry with bounded exponential backoff.
+    """
+    def report(state, retry_seconds=0):
+        if on_state:
+            try:
+                on_state(state, retry_seconds)
+            except Exception:
+                pass  # UI notification failure must never disable safe transport.
+
     delay=1
     while not stop_event.is_set():
         if not handler.session.status().get('active', False):
+            report('local_expired')
             return
-        task=asyncio.create_task(connect(settings,device_id,get_agent_secret,handler))
+        report('connecting')
+        if connect is connect_once:
+            attempt=connect(settings, device_id, get_agent_secret, handler,
+                            on_connected=lambda: report('connected'))
+        else:
+            attempt=connect(settings, device_id, get_agent_secret, handler)
+        task=asyncio.create_task(attempt)
         stopped=asyncio.create_task(stop_event.wait())
         try:
             done,_=await asyncio.wait({task,stopped},return_when=asyncio.FIRST_COMPLETED)
             if stopped in done:
                 task.cancel()
                 await asyncio.gather(task,return_exceptions=True)
+                report('stopped')
                 return
             stopped.cancel()
             await asyncio.gather(stopped,return_exceptions=True)
             await task
             delay=1
         except (PermissionError, ValueError):
+            report('authorization_required')
             return
         except asyncio.CancelledError:
             task.cancel()
             await asyncio.gather(task,return_exceptions=True)
             raise
-        except Exception:
-            # Transient network failure; no tokens or raw server errors in logs.
-            pass
+        except Exception as error:
+            # Never put raw transport errors, paths or credentials into UI/logs.
+            response=getattr(error, 'response', None)
+            status=getattr(response, 'status_code', None)
+            if status in (401, 403):
+                report('authorization_required')
+                return
         if stop_event.is_set():
+            report('stopped')
             return
+        if not handler.session.status().get('active', False):
+            report('local_expired')
+            return
+        report('retrying', delay)
         try:
             await asyncio.wait_for(stop_event.wait(),timeout=delay)
         except asyncio.TimeoutError:
             delay=min(delay*2,60)
+    report('stopped')

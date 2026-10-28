@@ -99,6 +99,11 @@ class Panel:
         self._last_tunnel_state = ''
         self._last_health = None
         self._flag_timer = None
+        self._cloud_start_pending = False
+        self._cloud_next_retry = 0.0
+        self._local_next_repair = 0.0
+        self.cloud_state_text = tk.StringVar(value='Nuvem: desconectada')
+        self.cloud_details = tk.StringVar(value='Conecte localmente para iniciar o Cloud.')
         self.events = queue.Queue()
         self.busy = False
         self.tray = None
@@ -647,28 +652,36 @@ class Panel:
         self._button(row, 'Reparar conexão', self.repair).pack(side='left')
         pair_edge, pair = self._card(page)
         pair_edge.pack(fill='x')
-        self._text(pair, 'PAREAMENTO', 12, 'bold', self.COLORS['cyan']).pack(anchor='w')
-        self._text(pair, 'Copie a credencial apenas para um cliente MCP autorizado.\n'
-                   'Acesso pela internet não é ativado automaticamente.',
-                   9 if self.compact_mode else 10,
-                   color=self.COLORS['subtle'], justify='left').pack(
-            anchor='w', pady=(4, 6) if self.compact_mode else (7, 14))
-        row = tk.Frame(pair, bg=self.COLORS['surface'])
-        row.pack(fill='x')
-        self._button(row, 'Copiar pareamento', self.copy_pairing,
-                     tone='primary').pack(side='left', padx=(0, 8))
-        self._button(row, 'Assistente', self.open_setup).pack(side='left')
-
-        # Public Cloud pairing has its own device credential and never exposes the
-        # localhost MCP bearer token to a remote service.
-        if self.cloud_controller:
+        if not self.cloud_controller:
+            self._text(pair, 'PAREAMENTO LOCAL AVANÇADO', 12, 'bold',
+                       self.COLORS['cyan']).pack(anchor='w')
+            self._text(pair, 'Copie a credencial apenas para um cliente MCP local autorizado. '
+                       'Este código não conecta automaticamente o ChatGPT.',
+                       9, color=self.COLORS['subtle'], wraplength=530,
+                       justify='left').pack(anchor='w', pady=(5, 10))
+            row = tk.Frame(pair, bg=self.COLORS['surface'])
+            row.pack(fill='x')
+            self._button(row, 'Copiar pareamento local', self.copy_pairing,
+                         tone='primary').pack(side='left', padx=(0, 8))
+            self._button(row, 'Assistente', self.open_setup).pack(side='left')
+        else:
+            # Keep the unrelated localhost bearer token out of the Cloud UI.
             self._text(pair, 'NAVIX CLOUD 0.3 — cada PC usa um código temporário próprio.',
                        10, 'bold', self.COLORS['cyan']).pack(anchor='w', pady=(12, 4))
+            self._text(pair, '', 11, 'bold', self.COLORS['cyan'],
+                       textvariable=self.cloud_state_text).pack(anchor='w', pady=(7, 2))
+            self._text(pair, '', 9, color=self.COLORS['text'],
+                       textvariable=self.cloud_details, wraplength=530,
+                       justify='left').pack(anchor='w', pady=(0, 10))
             cloud_actions = tk.Frame(pair, bg=self.COLORS['surface'])
             cloud_actions.pack(fill='x')
             self._button(cloud_actions, 'Vincular ao ChatGPT', self.enroll_cloud,
                          tone='primary').pack(side='left', padx=(0, 8))
-            self._button(cloud_actions, 'Reconectar nuvem', self.start_cloud).pack(side='left')
+            self._button(cloud_actions, 'Reparar conexão Cloud', self.repair).pack(side='left')
+            self._text(pair, 'O Cloud dispensa chave Runtime no cofre e não usa o túnel antigo. '
+                       'A confirmação inicial de vínculo no ChatGPT continua obrigatória.',
+                       9, color=self.COLORS['subtle'], wraplength=530,
+                       justify='left').pack(anchor='w', pady=(10, 0))
 
         uninstall_edge, uninstall_card = self._card(page)
         uninstall_edge.pack(fill='x', pady=(gap, 4 if self.compact_mode else 8))
@@ -858,7 +871,11 @@ class Panel:
         self.service.start()
         self.show('Sessão autorizada sem prazo neste processo.' if minutes is None else
                   f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
-        if hasattr(self, 'tunnel_settings'):
+        if self.cloud_controller:
+            # The owner already approved the local permissions. Reuse only an
+            # existing device pairing; never silently grant ChatGPT consent.
+            self._request_cloud_start(manual=False)
+        elif hasattr(self, 'tunnel_settings'):
             tunnel_id = self.tunnel_settings.load()
             key = self.tunnel_settings.load_key()
             if tunnel_id and key:
@@ -937,6 +954,7 @@ class Panel:
         if not self.session.status()['active'] or not self.service.ready:
             messagebox.showinfo('NavixX','Autorize primeiro uma sessão local e aguarde o MCP ficar pronto.')
             return
+        self.show('NavixX Cloud: solicitando código de vínculo. Aguarde...')
         def work():
             try:
                 data=self.cloud_controller.enroll()
@@ -951,21 +969,48 @@ class Panel:
                     time.sleep(3)
                 self.events.put('Pareamento não concluído neste prazo; gere outro código.')
             except Exception:
-                self.events.put('Navix Cloud: falha de pareamento. Verifique a conexão e tente novamente.')
+                self.events.put('Navix Cloud: não foi possível gerar/verificar o código. '
+                                'Confirme a internet e tente Vincular novamente.')
         threading.Thread(target=work,daemon=True,name='NavixCloudEnrollment').start()
 
-    def start_cloud(self):
+    def _request_cloud_start(self, manual=False):
         if not self.cloud_controller:
-            self.show('Navix Cloud ainda não configurado.')
+            self.show('Navix Cloud não está configurado neste instalador.')
             return
+        if self._cloud_start_pending:
+            self.show('Navix Cloud: a verificação da conexão já está em andamento.')
+            return
+        self._cloud_start_pending = True
+        self.show('Navix Cloud: verificando servidor local e vínculo com o ChatGPT...')
+
         def work():
             try:
+                # MCP uses port=0; wait for the dynamically chosen local port.
+                deadline=time.monotonic()+20
+                while self.session.status()['active'] and not self.service.ready:
+                    if time.monotonic() >= deadline:
+                        self.events.put(('cloud_failure',
+                                         'O MCP local não ficou pronto em 20 segundos. '
+                                         'Use Reparar conexão novamente.', manual))
+                        return
+                    time.sleep(0.4)
                 started=self.cloud_controller.start()
-                self.events.put('Navix Cloud: conectando...' if started else
-                                'Navix Cloud: já está conectando.')
+                self.events.put('Navix Cloud: conexão iniciada. Aguardando confirmação do canal...'
+                                if started else 'Navix Cloud: ' +
+                                self.cloud_controller.status()['message'])
+            except (PermissionError, ConnectionError, ValueError):
+                self.events.put(('cloud_failure',
+                                 self.cloud_controller.status()['message'], manual))
             except Exception:
-                self.events.put('Vincule o computador e autorize uma sessão local antes de reconectar.')
+                self.events.put(('cloud_failure',
+                                 'Falha inesperada na conexão Cloud. Use Reparar conexão.', manual))
+            finally:
+                self.events.put(('cloud_start_done',))
         threading.Thread(target=work,daemon=True,name='NavixCloudReconnect').start()
+
+    def start_cloud(self):
+        """Explicit button action, with immediate feedback before network I/O."""
+        self._request_cloud_start(manual=True)
 
     def open_setup(self):
         from .setup_assistant import open_assistant
@@ -976,6 +1021,8 @@ class Panel:
         self.show('Porta local: ' + str(self.service.port))
         self.show('Servidor MCP: ' + ('pronto' if self.service.ready else 'parado ou iniciando'))
         self.show('Sessão: ' + json.dumps(self.session.status(), ensure_ascii=False))
+        if self.cloud_controller:
+            self.show('Nuvem: ' + self.cloud_controller.status()['message'])
         for package in ('mcp', 'playwright', 'PyAutoGUI', 'Pillow'):
             try:
                 self.show(package + ': ' + importlib.metadata.version(package))
@@ -983,7 +1030,27 @@ class Panel:
                 self.show(package + ': metadados indisponíveis')
         self.show('Logs: ' + str(self.session.directory / 'audit.jsonl'))
 
-    def repair(self):
+    def repair(self, automatic=False):
+        if self.cloud_controller:
+            if not self.session.status()['active']:
+                self.show('Reparo Cloud: a autorização local expirou. '
+                          'Clique em Conectar / Autorizar; não é possível renová-la sem você.')
+                return
+            if self.service.ready:
+                self.show('Reparo Cloud: MCP local pronto; verificando a conexão remota...')
+                self._request_cloud_start(manual=not automatic)
+                return
+            if self.service.thread and self.service.thread.is_alive():
+                self.show('Reparo Cloud: MCP local ainda iniciando. Aguardando...')
+                self._request_cloud_start(manual=not automatic)
+                return
+            self.show('Reparo Cloud: reiniciando o MCP local e a conexão remota...')
+            self.service.close()
+            self.service = Service(self.session, self.browser, Desktop(self.session), port=0)
+            self.cloud_controller.service = self.service
+            self.service.start()
+            self._request_cloud_start(manual=not automatic)
+            return
         if self.service.ready:
             self.show('Servidor MCP local funcionando. Verificando também o cliente de túnel.')
             if not self.session.status()['active']:
@@ -1019,6 +1086,12 @@ class Panel:
                 self.show(f'Túnel: {event[1]} ({event[2]})')
             elif event == ('tunnel_done',):
                 self._tunnel_worker_running = False
+            elif event == ('cloud_start_done',):
+                self._cloud_start_pending = False
+            elif isinstance(event, tuple) and event[0] == 'cloud_failure':
+                self.show('Reparo Cloud: ' + event[1])
+                if event[2]:
+                    messagebox.showwarning('NavixX Cloud — reparo', event[1], parent=self.root)
             elif isinstance(event, tuple) and event[0] == 'tunnel_message':
                 self.show(event[1])
             elif event == ('show',):
@@ -1033,6 +1106,34 @@ class Panel:
                 return
             else: self.show(event)
         status = self.session.status()
+        if self.cloud_controller:
+            cloud = self.cloud_controller.status()
+            cloud_labels = {
+                'disconnected': 'DESCONECTADA', 'checking': 'VERIFICANDO',
+                'pairing': 'AGUARDANDO VÍNCULO', 'unpaired': 'VÍNCULO NECESSÁRIO',
+                'connecting': 'CONECTANDO', 'connected': 'CANAL ATIVO',
+                'verified': 'CHATGPT CONFIRMADO',
+                'retrying': 'RECONECTANDO', 'network_error': 'FALHA DE REDE',
+                'authorization_required': 'AUTORIZAÇÃO NECESSÁRIA',
+                'local_expired': 'SESSÃO LOCAL EXPIRADA',
+                'local_starting': 'INICIANDO MCP', 'stopped': 'DESATIVADA',
+            }
+            self.cloud_state_text.set('Nuvem: ' +
+                                      cloud_labels.get(cloud['state'], 'VERIFICANDO'))
+            self.cloud_details.set(cloud['message'])
+            now=time.monotonic()
+            # A dead local MCP is repaired while the *existing* owner grant is
+            # valid. Neither expired permissions nor ChatGPT OAuth are bypassed.
+            if (status['active'] and not self.service.ready and
+                    (not self.service.thread or not self.service.thread.is_alive()) and
+                    now >= self._local_next_repair):
+                self._local_next_repair = now + 20
+                self.repair(automatic=True)
+            elif (status['active'] and self.service.ready and
+                  cloud['state'] in ('disconnected', 'network_error') and
+                  not self._cloud_start_pending and now >= self._cloud_next_retry):
+                self._cloud_next_retry = now + 20
+                self._request_cloud_start(manual=False)
         tunnel_state = self.tunnel.check()
         self.tunnel_state.set(tunnel_state)
         health = (bool(self.service.ready), status['active'], tunnel_state)
@@ -1042,7 +1143,7 @@ class Panel:
                                     'info' if health[0] else 'warning',
                                     code='LOCAL_READY' if health[0] else 'LOCAL_NOT_READY')
             self._last_health = health
-        if tunnel_state == 'reconectar' and not self._tunnel_worker_running:
+        if not self.cloud_controller and tunnel_state == 'reconectar' and not self._tunnel_worker_running:
             self._launch_tunnel_worker()
         if status['active'] and self.service.ready:
             self.state.set('LOCAL PRONTO — sessão sem prazo' if status.get('unlimited') else
@@ -1074,6 +1175,8 @@ class Panel:
     def close(self):
         if self.tray:
             self.tray.stop()
+        if self.cloud_controller:
+            self.cloud_controller.stop()
         self.session.stop()
         self.tunnel.stop()
         self.service.close()

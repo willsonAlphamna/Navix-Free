@@ -53,6 +53,15 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result['ok'])
         self.assertEqual(result['result']['active'], True)
 
+    async def test_only_a_successful_remote_call_confirms_end_to_end(self):
+        calls=[]
+        handler=CloudRequestHandler(self.session,clock=lambda:1,
+                                    on_success=lambda tool:calls.append(tool))
+        self.assertTrue(json.loads(await handler.handle(call()))['ok'])
+        self.assertEqual(calls,['status'])
+        self.assertFalse(json.loads(await handler.handle(call('command_run')))['ok'])
+        self.assertEqual(calls,['status'])
+
     async def test_remote_call_denied_without_local_permission(self):
         result = json.loads(await self.handler.handle(call('command_run', {'command':'test'})))
         self.assertFalse(result['ok'])
@@ -102,15 +111,18 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_connect_once_sends_agent_secret_only_in_header(self):
         socket = FakeSocket([call()])
         captured = {}
+        states = []
         def fake_connect(url, **options):
             captured.update({'url':url, **options})
             return socket
         await connect_once(self.settings,'device_1234567890',lambda: 'a'*43,
-                           self.handler,websocket_connect=fake_connect)
+                           self.handler,websocket_connect=fake_connect,
+                           on_connected=lambda: states.append('connected'))
         self.assertEqual(captured['additional_headers']['X-Navix-Agent-Token'],'a'*43)
         self.assertEqual(captured['user_agent_header'],'NavixX-Desktop-Cloud/0.3.0')
         self.assertNotIn('a'*43,captured['url'])
         self.assertTrue(socket.sent[0]['ok'])
+        self.assertEqual(states, ['connected'])
 
     async def test_refuses_missing_agent_token_before_connect(self):
         with self.assertRaises(PermissionError):
@@ -135,6 +147,59 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         stop.set()
         await asyncio.wait_for(runner,1)
         self.assertTrue(cancelled.is_set())
+
+    async def test_permission_error_stops_and_explains_why(self):
+        states=[]
+        attempts=[]
+        async def invalid(*args):
+            attempts.append('try')
+            raise PermissionError('secret value must not be shown')
+        await run_until_stopped(self.settings,'device_1234567890',lambda:'a'*43,
+                                self.handler,asyncio.Event(),connect=invalid,
+                                on_state=lambda state,seconds: states.append((state,seconds)))
+        self.assertEqual(len(attempts),1)
+        self.assertEqual(states[-1][0],'authorization_required')
+        self.assertNotIn('secret value',str(states))
+
+    async def test_expired_local_authorization_does_not_reconnect(self):
+        self.session.active=False
+        states=[]
+        await run_until_stopped(self.settings,'device_1234567890',lambda:'a'*43,
+                                self.handler,asyncio.Event(),
+                                on_state=lambda state,seconds: states.append(state))
+        self.assertEqual(states,['local_expired'])
+
+    async def test_transient_failure_retries_and_reports_backoff(self):
+        attempts=[]
+        states=[]
+        connected=asyncio.Event()
+        stop=asyncio.Event()
+        async def flaky(*args):
+            attempts.append('try')
+            if len(attempts)==1:
+                raise OSError('internet offline')
+            connected.set()
+            await asyncio.Event().wait()
+        runner=asyncio.create_task(run_until_stopped(
+            self.settings,'device_1234567890',lambda:'a'*43,
+            self.handler,stop,connect=flaky,
+            on_state=lambda state,seconds: states.append((state,seconds))))
+        await asyncio.wait_for(connected.wait(),3)
+        stop.set()
+        await asyncio.wait_for(runner,1)
+        self.assertEqual(len(attempts),2)
+        self.assertIn(('retrying',1),states)
+
+    async def test_relay_refusing_device_requires_new_authorization(self):
+        class Refused(Exception):
+            response=type('Response',(),{'status_code':403})()
+        states=[]
+        async def denied(*args):
+            raise Refused('no raw error in the UI')
+        await run_until_stopped(self.settings,'device_1234567890',lambda:'a'*43,
+                                self.handler,asyncio.Event(),connect=denied,
+                                on_state=lambda state,seconds: states.append(state))
+        self.assertEqual(states[-1],'authorization_required')
 
 
 if __name__=='__main__':

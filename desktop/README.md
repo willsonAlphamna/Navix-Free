@@ -1,4 +1,40 @@
-# NavixX Desktop 0.2.11 — recuperação de conexão (pré-lançamento Windows)
+# NavixX Desktop — pré-lançamento Windows
+
+## NavixX Cloud Preview 0.3.0-alpha.6 — conexão e reparo
+
+Esta edição é instalada separadamente em `%LOCALAPPDATA%\Programs\NavixDesktopCloudPreview`
+e mantém seu perfil próprio em `%LOCALAPPDATA%\NavixDesktopCloudPreview`. Não altera o
+NavixX Desktop 0.2.11. O instalador é um pré-lançamento **não assinado**.
+
+1. Abra o Cloud Preview com sua senha local. Escolha as permissões, o prazo e clique
+   **Conectar / Autorizar**. A permissão continua sendo concedida pelo proprietário;
+   abrir o aplicativo sozinho não autoriza acesso remoto.
+2. Se o computador já foi vinculado, a conexão Cloud será iniciada automaticamente
+   depois que o MCP local estiver pronto, independentemente da porta aleatória.
+3. Se ainda não houve vínculo ou se a autorização foi recusada, use **Vincular ao
+   ChatGPT** e confirme o código de 6 dígitos no serviço. Isso não pode ser feito
+   automaticamente em seu nome.
+4. A tela Ferramentas mostra o estado Cloud e a causa provável de falhas. Use
+   **Reparar conexão Cloud** quando necessário. O assistente desta edição não
+   pede chave Runtime do túnel antigo.
+
+Após uma queda de rede, o canal tenta retornar com espera progressiva de até 60 s,
+sem alterar as permissões. Se o servidor MCP local parar inesperadamente, o painel
+tenta reabri-lo e acompanha a nova porta. A sessão expirada, uma ação de **PARAR
+ACESSO**, um vínculo ausente e uma autorização recusada exigem intervenção explícita.
+
+**Estados distintos:** “Canal ativo” comprova apenas o WebSocket com a nuvem;
+“ChatGPT confirmado” aparece somente depois que uma chamada de ferramenta real
+é atendida. Testes automáticos e instalação de CI não substituem o teste no PC
+do proprietário, incluindo sair e voltar ao chat.
+
+O restante deste documento registra a linha anterior 0.2.11 e seu túnel Runtime
+separado. **Não use as instruções de chave Runtime da 0.2.11 para configurar o
+Cloud Preview 0.3.**
+
+---
+
+## NavixX Desktop 0.2.11 — linha anterior
 
 Aplicativo novo, independente das versões anteriores do Navix. Painel em português, inglês e espanhol,
 servidor MCP local com credencial por execução, porta automática, ícone na bandeja, navegador integrado, suporte experimental

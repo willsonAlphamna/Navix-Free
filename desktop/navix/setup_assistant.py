@@ -61,6 +61,8 @@ def local_diagnostic(panel):
 
 def open_assistant(panel):
     """Scrollable onboarding, including diagnostics, even at high Windows DPI."""
+    if getattr(panel, 'cloud_controller', None):
+        return open_cloud_assistant(panel)
     dialog = tk.Toplevel(panel.root)
     dialog.title('NavixX Desktop — ' + translate('Assistente de conexão', panel.language))
     display_w, display_h = dialog.winfo_screenwidth(), dialog.winfo_screenheight()
@@ -319,3 +321,63 @@ def open_assistant(panel):
                 9, color=panel.COLORS['subtle']).pack(side='left')
     panel._button(footer, 'Fechar assistente', dialog.destroy,
                   tone='primary').pack(side='right')
+
+
+def open_cloud_assistant(panel):
+    """A single, understandable Cloud flow; never request legacy Runtime keys."""
+    dialog=tk.Toplevel(panel.root)
+    dialog.title('NavixX Cloud — assistente de conexão')
+    dialog.geometry('630x530')
+    dialog.minsize(570, 470)
+    dialog.configure(bg=panel.COLORS['base'])
+    dialog.transient(panel.root)
+    outer=tk.Frame(dialog, bg=panel.COLORS['base'], padx=22, pady=20)
+    outer.pack(fill='both', expand=True)
+
+    panel._text(outer, 'NAVIX CLOUD • CONEXÃO SIMPLIFICADA', 17, 'bold',
+                panel.COLORS['cyan']).pack(anchor='w', pady=(0, 7))
+    panel._text(outer, 'O Cloud não utiliza a chave Runtime nem o cofre do túnel antigo. '
+                'O código de 6 dígitos serve apenas para o primeiro vínculo ou '
+                'para renovar uma autorização recusada.', 10,
+                color=panel.COLORS['text'], wraplength=565,
+                justify='left').pack(anchor='w', pady=(0, 12))
+
+    steps=[
+        ('1. Autorize este computador',
+         'Marque as permissões desejadas e clique Conectar / Autorizar. '
+         'O MCP local inicia e o vínculo Cloud existente é reutilizado.'),
+        ('2. Vincule ao ChatGPT somente se solicitado',
+         'Se o computador ainda não estiver vinculado, gere o código e '
+         'confirme a autorização no ChatGPT. O NavixX não autoriza por você.'),
+        ('3. Repare automaticamente ou com um clique',
+         'A rede é monitorada em segundo plano enquanto sua sessão está válida. '
+         'O botão abaixo também verifica MCP e Cloud.'),
+    ]
+    for title, detail in steps:
+        edge,card=panel._card(outer, pad=11)
+        edge.pack(fill='x', pady=(0, 8))
+        panel._text(card,title,11,'bold',panel.COLORS['cyan']).pack(anchor='w')
+        panel._text(card,detail,9,color=panel.COLORS['text'],
+                    wraplength=520,justify='left').pack(anchor='w',pady=(4,0))
+
+    line=tk.Frame(outer,bg=panel.COLORS['base'])
+    line.pack(fill='x',pady=(2,10))
+    panel._button(line,'Conectar / Autorizar',panel.connect,
+                  tone='primary').pack(side='left',padx=(0,7))
+    panel._button(line,'Vincular ao ChatGPT',panel.enroll_cloud).pack(side='left',padx=(0,7))
+    panel._button(line,'Reparar conexão',panel.repair).pack(side='left')
+
+    state=tk.StringVar()
+    panel._text(outer,'',10,'bold',panel.COLORS['cyan'],textvariable=state,
+                wraplength=545,justify='left').pack(anchor='w',pady=(0,9))
+
+    def refresh():
+        if not dialog.winfo_exists():
+            return
+        local=panel.session.status().get('active') and panel.service.ready
+        cloud=panel.cloud_controller.status()
+        state.set(('MCP local: pronto' if local else 'MCP local: não autorizado ou iniciando') +
+                  '\nCloud: ' + cloud['message'])
+        dialog.after(800,refresh)
+    refresh()
+    panel._button(outer,'Fechar',dialog.destroy).pack(anchor='e')
