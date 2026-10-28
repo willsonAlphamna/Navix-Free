@@ -128,6 +128,17 @@ def test_real_navigation_form_upload_download(real_browser, tmp_path):
     assert all(tab['id'] != page for tab in browser.call('tabs'))
 
 
+def test_browser_recovers_after_last_tab_closes(real_browser):
+    browser, session, url = real_browser
+    page = browser.call('open', url=url)['id']
+    browser.call('close_tab', page_id=page)
+    # Playwright may close the persistent context with its last tab.
+    browser.call('start')
+    new_page = browser.call('open', url=url)['id']
+    assert new_page in {tab['id'] for tab in browser.call('tabs')}
+    assert 'Próxima' in browser.call('read', page_id=new_page)
+
+
 def test_real_download_transfer_deadline(real_browser, tmp_path):
     browser, session, url = real_browser
     page = browser.call('open', url=url)['id']
