@@ -12,7 +12,7 @@ from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from .cloud import authorize_cloud_tool
 
-_DEVICE = re.compile(r'^[A-Za-z0-9_-]{8,128}$')
+_DEVICE = re.compile(r'^[A-Za-z0-9_-]{16,128}$')
 _CALL_ID = re.compile(r'^[0-9a-f-]{36}$', re.I)
 _TOOLS = frozenset("""
 browser_back browser_click browser_close_tab browser_download browser_fill
