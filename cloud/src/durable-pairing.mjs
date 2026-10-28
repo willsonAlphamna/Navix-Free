@@ -41,23 +41,25 @@ export class DurablePairing {
         !DEVICE.test(deviceId) || typeof code !== 'string' || !CODE.test(code)) {
       throw new Error('Confirmação inválida');
     }
-    return this.storage.transaction(async txn=>{
+    const outcome=await this.storage.transaction(async txn=>{
       const entry=await txn.get('device');
       if (!entry || entry.ownerId || entry.deviceId!==deviceId) throw new Error('Pareamento não encontrado');
       if (entry.expiresAt <= this.now()) {
-        await txn.delete('device');throw new Error('Código expirado');
+        await txn.delete('device');return {error:'Código expirado'};
       }
-      if (entry.attempts>=this.maxAttempts) throw new Error('Tentativas excedidas');
+      if (entry.attempts>=this.maxAttempts) return {error:'Tentativas excedidas'};
       const actual=await codeDigest(entry.salt,code);
       entry.attempts++;
       if (!safe(actual,entry.codeHash)) {
         if (entry.attempts>=this.maxAttempts) await txn.delete('device');
         else await txn.put('device',entry);
-        throw new Error('Código incorreto');
+        return {error:'Código incorreto'};
       }
       await txn.put('device',{deviceId,ownerId,tokenHash:entry.tokenHash,approvedAt:this.now()});
       return {deviceId,linked:true};
     });
+    if (outcome.error) throw new Error(outcome.error);
+    return outcome;
   }
   async verifyAgent(agentSecret) {
     if (typeof agentSecret !== 'string' || !SECRET.test(agentSecret)) return false;
