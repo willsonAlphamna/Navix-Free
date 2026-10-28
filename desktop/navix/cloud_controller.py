@@ -139,6 +139,10 @@ class CloudController:
         async def main():
             self.loop=asyncio.get_running_loop()
             self.stop_event=asyncio.Event()
+            # PARAR ACESSO may have been clicked between the thread's first
+            # check and creation of its async event. Do not open a stale canal.
+            if self._stop_requested.is_set():
+                self.stop_event.set()
             # This controller is a live service reference. LocalMCPInvoker
             # therefore follows a replaced MCP server and its random port.
             handler=CloudRequestHandler(self.session,

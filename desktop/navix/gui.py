@@ -1130,7 +1130,7 @@ class Panel:
                 self._local_next_repair = now + 20
                 self.repair(automatic=True)
             elif (status['active'] and self.service.ready and
-                  cloud['state'] in ('disconnected', 'network_error') and
+                  cloud['state'] in ('disconnected', 'network_error', 'stopped') and
                   not self._cloud_start_pending and now >= self._cloud_next_retry):
                 self._cloud_next_retry = now + 20
                 self._request_cloud_start(manual=False)
