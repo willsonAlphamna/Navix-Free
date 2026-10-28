@@ -871,7 +871,7 @@ class Panel:
         self.service.start()
         self.show('Sessão autorizada sem prazo neste processo.' if minutes is None else
                   f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             # The owner already approved the local permissions. Reuse only an
             # existing device pairing; never silently grant ChatGPT consent.
             self._request_cloud_start(manual=False)
@@ -883,7 +883,7 @@ class Panel:
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             self.cloud_controller.stop()
         self.tunnel.stop()
         self.session.stop()
@@ -1021,7 +1021,7 @@ class Panel:
         self.show('Porta local: ' + str(self.service.port))
         self.show('Servidor MCP: ' + ('pronto' if self.service.ready else 'parado ou iniciando'))
         self.show('Sessão: ' + json.dumps(self.session.status(), ensure_ascii=False))
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             self.show('Nuvem: ' + self.cloud_controller.status()['message'])
         for package in ('mcp', 'playwright', 'PyAutoGUI', 'Pillow'):
             try:
@@ -1031,7 +1031,7 @@ class Panel:
         self.show('Logs: ' + str(self.session.directory / 'audit.jsonl'))
 
     def repair(self, automatic=False):
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             if not self.session.status()['active']:
                 self.show('Reparo Cloud: a autorização local expirou. '
                           'Clique em Conectar / Autorizar; não é possível renová-la sem você.')
@@ -1106,7 +1106,7 @@ class Panel:
                 return
             else: self.show(event)
         status = self.session.status()
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             cloud = self.cloud_controller.status()
             cloud_labels = {
                 'disconnected': 'DESCONECTADA', 'checking': 'VERIFICANDO',
@@ -1143,7 +1143,7 @@ class Panel:
                                     'info' if health[0] else 'warning',
                                     code='LOCAL_READY' if health[0] else 'LOCAL_NOT_READY')
             self._last_health = health
-        if not self.cloud_controller and tunnel_state == 'reconectar' and not self._tunnel_worker_running:
+        if not getattr(self, 'cloud_controller', None) and tunnel_state == 'reconectar' and not self._tunnel_worker_running:
             self._launch_tunnel_worker()
         if status['active'] and self.service.ready:
             self.state.set('LOCAL PRONTO — sessão sem prazo' if status.get('unlimited') else
@@ -1175,7 +1175,7 @@ class Panel:
     def close(self):
         if self.tray:
             self.tray.stop()
-        if self.cloud_controller:
+        if getattr(self, 'cloud_controller', None):
             self.cloud_controller.stop()
         self.session.stop()
         self.tunnel.stop()

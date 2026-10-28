@@ -60,6 +60,8 @@ class CloudController:
         return self.service.ready
 
     def _set_state(self, state, seconds=0):
+        if self._stop_requested.is_set() and state != 'stopped':
+            return  # A late WebSocket/call callback must not undo PARAR ACESSO.
         message=self._MESSAGES[state].format(seconds=seconds)
         with self.lock:
             changed=self._state != state or self._message != message
