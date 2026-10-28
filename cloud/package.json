@@ -1,6 +1,6 @@
 {
   "name": "navixx-cloud",
-  "version": "0.3.0-alpha.1",
+  "version": "0.3.0-alpha.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,8 @@
     "jose": "^6.1.0"
   },
   "devDependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "ws": "^8.18.0",
     "wrangler": "latest"
   }
 }

@@ -1,8 +1,9 @@
 import {DurableObject} from 'cloudflare:workers';
-import {authenticate, configFromEnv} from './auth.mjs';
 import {DurablePairing} from './durable-pairing.mjs';
-import {PendingCalls} from './relay-protocol.mjs';
-import {protectedResourceMetadata,oauthChallenge} from './oauth-resource.mjs';
+import {PendingCalls,TOOL_SET} from './relay-protocol.mjs';
+import {DeviceOAuth,authMetadata,authorizationParams,htmlResponse,oauthRedirect,
+  pairingPage,parseForm,resourceFor,splitCredential,CLIENT_ID,CALLBACK,SCOPE} from './device-oauth.mjs';
+import {handleMcp,validateToolArguments} from './mcp-http.mjs';
 
 const DEVICE = /^[A-Za-z0-9_-]{16,128}$/;
 const json = (body,status=200) => new Response(JSON.stringify(body),{
@@ -15,8 +16,9 @@ const scopedDevice = url => {
 };
 const stubFor=(env,deviceId)=>env.DEVICE_RELAY.get(env.DEVICE_RELAY.idFromName('device-v1:'+deviceId));
 const secretFrom=req=>req.headers.get('x-navix-agent-token')||'';
+const publicControlEnabled=env=>env.NAVIX_PUBLIC_CONTROL==='enabled';
 
-async function boundedJson(req) {
+async function boundedJson(req,maxBytes=8192) {
   const reader=req.body?.getReader();
   if(!reader) throw new Error('Corpo JSON obrigatório');
   const chunks=[];let size=0;
@@ -25,7 +27,7 @@ async function boundedJson(req) {
       const {done,value}=await reader.read();
       if(done)break;
       size+=value.byteLength;
-      if(size>8192)throw new Error('Mensagem grande demais');
+      if(size>maxBytes)throw new Error('Mensagem grande demais');
       chunks.push(value);
     }
   } catch(error){await reader.cancel().catch(()=>{});throw error;}
@@ -36,36 +38,111 @@ async function boundedJson(req) {
   return data;
 }
 
+const challengeFor=request=>
+  'Bearer resource_metadata="'+new URL(request.url).origin+'/.well-known/oauth-protected-resource", scope="'+SCOPE+'"';
+
+async function authorizedDevice(request,env,deviceId=''){
+  const match=/^Bearer ([A-Za-z0-9_.-]+)$/.exec(request.headers.get('authorization')||'');
+  if(!match)throw new Error('Bearer ausente');
+  const parsed=splitCredential(match[1]);
+  if(deviceId&&deviceId!==parsed.deviceId)throw new Error('Token de outro computador');
+  const result=await stubFor(env,parsed.deviceId).fetch(new Request('https://device.local/oauth/verify',{
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({token:match[1],resource:resourceFor(request.url)}),
+  }));
+  if(!result.ok)throw new Error('Credencial não autorizada');
+  const response=await result.json();
+  if(!response.ownerId)throw new Error('Titular desconhecido');
+  return {deviceId:parsed.deviceId,ownerId:response.ownerId};
+}
+
 export default {
   async fetch(request,env) {
     const url=new URL(request.url);
     if(url.pathname==='/healthz' && request.method==='GET'){
-      return json({service:'navixx-cloud',version:'0.3.0-alpha.2',public_tools_enabled:false});
+      return json({service:'navixx-cloud',version:'0.3.0-alpha.3',
+        public_tools_enabled:publicControlEnabled(env)});
     }
     if(url.pathname==='/.well-known/oauth-protected-resource' && request.method==='GET'){
-      try{return json(protectedResourceMetadata(env,request.url));}
-      catch{return json({error:'Identidade não configurada'},503);}
+      return json({resource:url.origin,authorization_servers:[url.origin],
+        scopes_supported:[SCOPE],bearer_methods_supported:['header'],
+        resource_documentation:'https://github.com/willsonAlphamna/Navix-Free'});
+    }
+    if(url.pathname==='/.well-known/oauth-authorization-server' && request.method==='GET'){
+      return json(authMetadata(url.origin));
+    }
+    if(url.pathname==='/oauth/authorize'){
+      if(!['GET','POST'].includes(request.method))return json({error:'Método inválido'},405);
+      let params,body;
+      try {
+        body=request.method==='POST'?await parseForm(request):url.searchParams;
+        params=authorizationParams(body,url.origin);
+      } catch {return htmlResponse('<h1>Solicitação OAuth inválida</h1>',400);}
+      if(request.method==='GET')return htmlResponse(pairingPage(params));
+      const deviceId=body.get('device_id'),code=body.get('code');
+      if(!deviceId||!DEVICE.test(deviceId)||!/^\d{6}$/.test(code||'')){
+        return htmlResponse(pairingPage(params,{error:'Confira o ID e o código do NavixX.'}),400);
+      }
+      const response=await stubFor(env,deviceId).fetch(new Request('https://device.local/oauth/code',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({...params,deviceId,code}),
+      }));
+      if(!response.ok)return htmlResponse(pairingPage(params,{
+        error:'Código expirado, incorreto ou vinculação indisponível. Gere outro no PC.'}),403);
+      const {authorizationCode}=await response.json();
+      return new Response(null,{status:302,headers:{Location:oauthRedirect(params,authorizationCode,url.origin),
+        'cache-control':'no-store','referrer-policy':'no-referrer'}});
+    }
+    if(url.pathname==='/oauth/token'){
+      if(request.method!=='POST')return json({error:'invalid_request'},405);
+      try {
+        const params=await parseForm(request);
+        const grant=params.get('grant_type'),clientId=params.get('client_id');
+        const resource=params.get('resource')||url.origin;
+        if(clientId!==CLIENT_ID||resource!==url.origin)throw new Error('Cliente não autorizado');
+        const credential=grant==='authorization_code'?params.get('code'):
+          grant==='refresh_token'?params.get('refresh_token'):null;
+        const {deviceId}=splitCredential(credential);
+        const path=grant==='authorization_code'?'/oauth/token':'/oauth/refresh';
+        const payload=grant==='authorization_code'?{
+          code:credential,clientId,redirectUri:params.get('redirect_uri'),
+          verifier:params.get('code_verifier'),resource,
+        }:{refreshToken:credential,clientId,resource};
+        const response=await stubFor(env,deviceId).fetch(new Request('https://device.local'+path,{
+          method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload),
+        }));
+        if(!response.ok)throw new Error('Grant inválido');
+        return json(await response.json());
+      } catch{return json({error:'invalid_grant'},400);}
     }
     if(url.pathname==='/mcp'){
-      // No public access until OAuth/OIDC + Windows consent + cross-user e2e tests.
-      try{configFromEnv(env);}catch{return json({error:'Identidade não configurada'},503);}
-      try{await authenticate(request,env,'navix:control');}
+      if(!publicControlEnabled(env))return json({error:'Controle remoto público em validação'},503);
+      let identity;
+      try{identity=await authorizedDevice(request,env);}
       catch {
-        return new Response(JSON.stringify({error:'Não autorizado'}),{status:401,headers:{
-          'content-type':'application/json','cache-control':'no-store',
-          'www-authenticate':oauthChallenge(env,request.url),
-        }});
+        return new Response(JSON.stringify({error:'Não autorizado'}),{status:401,
+          headers:{'content-type':'application/json','cache-control':'no-store',
+            'www-authenticate':challengeFor(request)}});
       }
-      return json({error:'MCP público ainda não habilitado'},503);
+      return handleMcp(request,{execute:async (tool,args)=>{
+        const response=await stubFor(env,identity.deviceId).fetch(new Request(
+          'https://device.local/execute',{method:'POST',headers:{
+            'content-type':'application/json','x-navix-owner':identity.ownerId},
+            body:JSON.stringify({tool,args}),
+          }));
+        if(!response.ok)throw new Error('Computador indisponível');
+        const body=await response.json();
+        return body.result;
+      }});
     }
     const route=url.pathname;
-    if(!['/api/pair/start','/api/pair/state','/api/pair/approve','/api/pair/revoke',
+    if(!['/api/pair/start','/api/pair/renew','/api/pair/state','/api/pair/approve','/api/pair/revoke',
          '/api/device/connect','/api/device/status','/api/device/execute'].includes(route)){
       return json({error:'Não encontrado'},404);
     }
     let deviceId,payload;
     try {
-      if(route==='/api/pair/start'||route==='/api/pair/approve'||route==='/api/pair/revoke'){
+      if(route==='/api/pair/start'||route==='/api/pair/renew'||route==='/api/pair/approve'||route==='/api/pair/revoke'){
         if(request.method!=='POST')return json({error:'Método inválido'},405);
         payload=await boundedJson(request);
         deviceId=payload.device_id;
@@ -80,6 +157,12 @@ export default {
       return stub.fetch(new Request('https://device.local/pair/start',{method:'POST',
         headers:{'content-type':'application/json'},
         body:JSON.stringify({deviceId,code:payload.code,agentSecret:payload.agent_secret}),
+      }));
+    }
+    if(route==='/api/pair/renew'){
+      return stub.fetch(new Request('https://device.local/pair/renew',{method:'POST',
+        headers:{'content-type':'application/json','x-navix-agent-token':secretFrom(request)},
+        body:JSON.stringify({deviceId,code:payload.code}),
       }));
     }
     if(route==='/api/pair/state'){
@@ -97,10 +180,8 @@ export default {
         headers:{Upgrade:'websocket','x-navix-agent-token':secretFrom(request)},
       }));
     }
-    // From here only owner-verified OAuth requests (no shared master API key).
-    try {configFromEnv(env);} catch {return json({error:'Identidade não configurada'},503);}
     let owner;
-    try {owner=(await authenticate(request,env,'navix:control')).ownerId;}
+    try {owner=(await authorizedDevice(request,env,deviceId)).ownerId;}
     catch{return json({error:'Não autorizado'},401);}
 
     if(route==='/api/pair/approve'||route==='/api/pair/revoke'){
@@ -117,11 +198,10 @@ export default {
       }));
     }
     if(request.method!=='POST')return json({error:'Método inválido'},405);
-    try{payload=await boundedJson(request);}catch{return json({error:'JSON inválido'},400);}
-    // Status is the only permitted call until the MCP protocol and consent UI ship.
-    if(payload.tool!=='status' || Object.keys(payload).some(k=>!['tool','args'].includes(k))){
-      return json({error:'Comandos ainda não habilitados'},503);
-    }
+    if(!publicControlEnabled(env))return json({error:'Controle remoto em validação'},503);
+    try{payload=await boundedJson(request,8*1024*1024);
+      validateToolArguments(payload.tool,payload.args||{});
+    }catch{return json({error:'JSON ou ferramenta inválida'},400);}
     return stub.fetch(new Request('https://device.local/execute',{
       method:'POST',headers:{'content-type':'application/json','x-navix-owner':owner},
       body:JSON.stringify(payload),
@@ -131,6 +211,7 @@ export default {
 
 export class DeviceRelay extends DurableObject {
   get pairing(){return new DurablePairing(this.ctx.storage);}
+  get oauth(){return new DeviceOAuth(this.ctx.storage,this.pairing);}
   connectSocket(server){
     this.calls?.close();
     this.liveSocket=server;
@@ -151,6 +232,31 @@ export class DeviceRelay extends DurableObject {
         const data=await request.json();
         return json(await this.pairing.start(data),201);
       } catch{return json({error:'Pareamento indisponível'},409);}
+    }
+    if(route==='/pair/renew'){
+      try {
+        const body=await request.json();
+        return json(await this.pairing.renewCode({...body,agentSecret:secretFrom(request)}));
+      } catch{return json({error:'Código não renovado'},403);}
+    }
+    if(route==='/oauth/code'){
+      try {
+        const body=await request.json();
+        return json({authorizationCode:await this.oauth.createCode(body)});
+      }catch{return json({error:'Não foi possível vincular'},403);}
+    }
+    if(route==='/oauth/token'||route==='/oauth/refresh'){
+      try {
+        const body=await request.json();
+        return json(route==='/oauth/token'?await this.oauth.exchangeCode(body):
+          await this.oauth.refresh(body));
+      }catch{return json({error:'invalid_grant'},400);}
+    }
+    if(route==='/oauth/verify'){
+      try {
+        const {token,resource}=await request.json();
+        return json(await this.oauth.verifyAccess(token,resource));
+      }catch{return json({error:'Não autorizado'},401);}
     }
     if(route==='/pair/state'){
       // The bearer token is opaque and local to this Windows installation.
@@ -178,10 +284,13 @@ export class DeviceRelay extends DurableObject {
       if(request.method!=='POST')return json({error:'Método inválido'},405);
       let command;
       try{command=await request.json();}catch{return json({error:'JSON inválido'},400);}
-      if(command?.tool!=='status'||!this.calls){
+      if(!command||!TOOL_SET.has(command.tool)||!this.calls){
         return json({error:'Dispositivo indisponível ou ferramenta bloqueada'},503);
       }
-      try{return json({result:await this.calls.call('status',command.args||{},15_000)});}
+      try{
+        validateToolArguments(command.tool,command.args||{});
+        return json({result:await this.calls.call(command.tool,command.args||{},30_000)});
+      }
       catch{return json({error:'Dispositivo sem resposta'},504);}
     }
     if(route==='/connect'){

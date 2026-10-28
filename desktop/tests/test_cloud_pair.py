@@ -69,6 +69,16 @@ class CloudPairTests(unittest.TestCase):
         self.assertEqual(req.get_header('X-navix-agent-token'),self.identity.agent_secret)
         self.assertNotIn(self.identity.agent_secret,req.full_url)
 
+    def test_renew_uses_existing_device_secret_without_openai_api_key(self):
+        client=PairingHttpClient(self.settings,self.opener)
+        result=client.renew(self.identity)
+        self.assertEqual(result['device_id'],self.identity.device_id)
+        self.assertEqual(len(result['verification_code']),6)
+        req,_=self.opener.requests[0]
+        self.assertTrue(req.full_url.endswith('/api/pair/renew'))
+        self.assertEqual(req.get_header('X-navix-agent-token'),self.identity.agent_secret)
+        self.assertNotIn('Authorization',req.headers)
+
     def test_rejects_disabled_or_http_endpoints(self):
         for settings in (CloudSettings(),CloudSettings(enabled=True,relay_url='ws://insecure.example')):
             with self.assertRaises(ValueError):

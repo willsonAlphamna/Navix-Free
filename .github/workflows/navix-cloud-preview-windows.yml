@@ -1,0 +1,87 @@
+name: NavixX 0.3 - Windows Cloud Preview (isolado)
+on:
+  push:
+    branches: [codex/navixx-cloud-v0_3-foundation]
+    paths: ['desktop/**', '.github/workflows/navix-cloud-preview-windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-preview:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: desktop/requirements.txt
+      - name: Instalar dependencias e executar testes
+        shell: pwsh
+        run: |
+          python -m pip install -r requirements.txt pytest pyinstaller
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:NAVIX_TEST_BROWSER = '1'
+          python -m pytest -q
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Criar executavel independente e icones
+        shell: pwsh
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
+          python -m playwright install --no-shell chromium
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m navix.brand
+          python -m pip freeze | Out-File -Encoding utf8 DEPENDENCIES.txt
+          python -m PyInstaller --noconfirm --clean --windowed --onedir --name NavixDesktop --icon assets/navix.ico --add-data "assets;assets" --hidden-import pystray._win32 --collect-all playwright --collect-submodules mcp.server --collect-submodules mcp.shared --collect-data mcp --copy-metadata mcp --copy-metadata playwright --copy-metadata PyAutoGUI --copy-metadata Pillow --add-data "browsers;browsers" launcher.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller --noconfirm --clean --console --onedir --name NavixPython --collect-all playwright --collect-all mcp --hidden-import pyautogui --hidden-import PIL.Image --hidden-import tkinter python_runner.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item dist\NavixPython dist\NavixDesktop\python-runtime -Recurse
+      - name: Testar executavel empacotado
+        shell: pwsh
+        run: |
+          $report = "$PWD\packaged-selftest.json"
+          $check = Start-Process dist\NavixDesktop\NavixDesktop.exe -ArgumentList '--self-test', $report -Wait -PassThru
+          Get-Content $report
+          if ($check.ExitCode -ne 0) { throw 'Autoteste empacotado falhou' }
+      - name: Gerar instalador independente de 0.2.11
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer-cloud-preview.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-FileHash output-cloud-preview\*.exe -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 output-cloud-preview\SHA256.txt
+          Copy-Item DEPENDENCIES.txt output-cloud-preview\
+          Copy-Item packaged-selftest.json output-cloud-preview\
+      - name: Testar instalacao e desinstalacao sem tocar Navix 0.2.11
+        shell: pwsh
+        run: |
+          $installer = 'output-cloud-preview\NavixDesktop-CloudPreview-Setup-0.3.0-alpha.3.exe'
+          $install = Start-Process $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw 'Instalacao do preview falhou' }
+          $path = "$env:LOCALAPPDATA\Programs\NavixDesktopCloudPreview"
+          $exe = "$path\NavixDesktop.exe"
+          if (!(Test-Path $exe)) { throw 'Executavel do preview nao encontrado' }
+          if (!(Test-Path "$path\navix-cloud-preview.flag")) { throw 'Falta configuracao isolada do preview' }
+          $process = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($process.HasExited) { throw 'Janela Navix Cloud Preview nao abriu' }
+          Stop-Process -Id $process.Id
+          $remove = Start-Process "$path\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw 'Desinstalacao do preview falhou' }
+          if (Test-Path $exe) { throw 'Preview permaneceu instalado' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NavixX-0.3-CloudPreview-Windows
+          path: desktop/output-cloud-preview/
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: NavixX-0.3-diagnostico
+          path: desktop/packaged-selftest.json

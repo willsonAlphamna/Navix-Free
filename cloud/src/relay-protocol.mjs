@@ -13,7 +13,7 @@ export const TOOL_NAMES = Object.freeze([
 export const TOOL_SET = new Set(TOOL_NAMES);
 const PERMISSIONS = Object.freeze({browser:'browser',command:'commands',desktop:'desktop',files:'files'});
 const ID_RE = /^[0-9a-f-]{36}$/i;
-const MAX_REQUEST_BYTES = 256 * 1024;
+const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const MAX_RESPONSE_BYTES = 12 * 1024 * 1024;
 const MAX_WAIT_MS = 60_000;
 

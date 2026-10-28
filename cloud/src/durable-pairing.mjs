@@ -61,6 +61,53 @@ export class DurablePairing {
     if (outcome.error) throw new Error(outcome.error);
     return outcome;
   }
+  /** One-time browser sign-in using the code shown on the consenting PC.
+   * No email address, OpenAI key or shared account credential is required.
+   */
+  async claimWithCode({deviceId,code}) {
+    if(!DEVICE.test(deviceId)||!CODE.test(code))throw new Error('Código inválido');
+    const result=await this.storage.transaction(async txn=>{
+      const state=await txn.get('device');
+      if(!state||state.deviceId!==deviceId)throw new Error('Computador não encontrado');
+      const pending=state.ownerId?state.oauthChallenge:state;
+      if(!pending||pending.expiresAt<=this.now())throw new Error('Código expirado');
+      if(pending.attempts>=this.maxAttempts)throw new Error('Tentativas excedidas');
+      const actual=await codeDigest(pending.salt,code);
+      pending.attempts++;
+      if(!safe(actual,pending.codeHash)){
+        if(pending.attempts>=this.maxAttempts){
+          if(state.ownerId)delete state.oauthChallenge;
+          else {await txn.delete('device');return {error:'Tentativas excedidas'};}
+        }
+        if(await txn.get('device'))await txn.put('device',state);
+        return {error:'Código incorreto'};
+      }
+      const ownerId=state.ownerId||'device:'+deviceId;
+      await txn.put('device',{deviceId,ownerId,tokenHash:state.tokenHash,
+                               approvedAt:state.approvedAt||this.now()});
+      return {ownerId};
+    });
+    if(result.error)throw new Error(result.error);
+    return result;
+  }
+  /** Existing owner can obtain a fresh one-time sign-in code via its agent secret. */
+  async renewCode({deviceId,agentSecret,code}) {
+    if(!DEVICE.test(deviceId)||!SECRET.test(agentSecret)||!CODE.test(code)){
+      throw new Error('Solicitação inválida');
+    }
+    const hash=await digest(agentSecret);
+    return this.storage.transaction(async txn=>{
+      const state=await txn.get('device');
+      if(!state?.ownerId||state.deviceId!==deviceId||!safe(state.tokenHash,hash)){
+        throw new Error('Dispositivo não vinculado');
+      }
+      if(state.oauthChallenge?.expiresAt>this.now())throw new Error('Código anterior ainda ativo');
+      const salt=randomSalt(),expiresAt=this.now()+this.ttlMs;
+      state.oauthChallenge={salt,codeHash:await codeDigest(salt,code),expiresAt,attempts:0};
+      await txn.put('device',state);
+      return {deviceId,expiresAt};
+    });
+  }
   async verifyAgent(agentSecret) {
     if (typeof agentSecret !== 'string' || !SECRET.test(agentSecret)) return false;
     const state=await this.storage.get('device');

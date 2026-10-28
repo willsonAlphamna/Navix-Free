@@ -50,7 +50,7 @@ class CloudRequestHandler:
     async def handle(self, frame):
         call_id = ''
         try:
-            if not isinstance(frame, str) or len(frame.encode('utf-8')) > 262144:
+            if not isinstance(frame, str) or len(frame.encode('utf-8')) > 8*1024*1024:
                 raise ValueError('Mensagem inválida ou grande demais.')
             request = json.loads(frame)
             if not isinstance(request, dict):

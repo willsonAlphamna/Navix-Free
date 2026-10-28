@@ -107,6 +107,18 @@ class PairingHttpClient:
         return {'device_id':identity.device_id,'verification_code':code,
                 'expires_at':result['expiresAt']}
 
+    def renew(self, identity: DeviceIdentity):
+        """Fresh device-proof for another ChatGPT authorization, no new secrets."""
+        identity.validate()
+        code=f'{secrets.randbelow(1000000):06d}'
+        result=self._json('/api/pair/renew',{
+            'device_id':identity.device_id,'code':code,
+        },agent_secret=identity.agent_secret)
+        if result.get('deviceId')!=identity.device_id or not isinstance(result.get('expiresAt'),int):
+            raise RuntimeError('Não foi possível gerar novo código.')
+        return {'device_id':identity.device_id,'verification_code':code,
+                'expires_at':result['expiresAt']}
+
     def status(self, identity: DeviceIdentity):
         identity.validate()
         result=self._json('/api/pair/state?'+urlencode({'device_id':identity.device_id}),

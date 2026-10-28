@@ -1,5 +1,5 @@
 {
-  "name": "navixx-cloud-alpha",
+  "name": "navixx-cloud-staging",
   "main": "src/worker.mjs",
   "compatibility_date": "2026-10-28",
   "durable_objects": {

@@ -67,7 +67,7 @@ class CloudClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result['ok'])
 
     async def test_expired_and_malformed_envelopes(self):
-        for payload in [call(deadline=10), 'not-json', json.dumps([]), 'x'*270000]:
+        for payload in [call(deadline=10), 'not-json', json.dumps([]), 'x'*9_000_000]:
             self.assertFalse(json.loads(await self.handler.handle(payload))['ok'])
 
     async def test_dispatch_requires_explicit_handler(self):

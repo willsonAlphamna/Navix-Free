@@ -29,7 +29,8 @@ class CloudController:
         if not self.session.status().get('active'):
             raise PermissionError('Autorize uma sessão local antes de parear.')
         identity=self.identity_store.ensure()
-        return PairingHttpClient(self.settings).begin(identity)
+        client=PairingHttpClient(self.settings)
+        return client.renew(identity) if client.status(identity) else client.begin(identity)
 
     def paired(self):
         identity=self.identity_store.load()

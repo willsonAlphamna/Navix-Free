@@ -20,7 +20,7 @@ test('aceita chamada válida e recusa comandos fora da whitelist',()=>{
   assert.throws(()=>makeCall({tool:'files_read',args:[]}),/Argumentos/);
 });
 test('limita payload e deadline de mensagens',()=>{
-  assert.throws(()=>makeCall({tool:'desktop_type',args:{text:'x'.repeat(300_000)}}),/grande/);
+  assert.throws(()=>makeCall({tool:'desktop_type',args:{text:'x'.repeat(9_000_000)}}),/grande/);
   assert.throws(()=>makeCall({tool:'status',deadline:Date.now()-10}),/Prazo/);
   assert.throws(()=>makeCall({tool:'status',deadline:Date.now()+120_000}),/Prazo/);
 });
