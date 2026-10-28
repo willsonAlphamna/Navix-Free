@@ -2,6 +2,8 @@
 
 Status: **desenvolvimento, ainda NÃO conectado ao ChatGPT e NÃO autorizado para acesso remoto público**.
 
+**CI do protótipo (28/10/2026):** [execução 40617995998](https://github.com/willsonAlphamna/Navix-Free/actions/runs/40617995998) concluída com **11 testes Node + 38 testes Windows aprovados**, além de `wrangler deploy --dry-run` aprovado. Isso **não** comprova serviço hospedado nem pareamento real com o ChatGPT.
+
 ## Objetivo
 
 Permitir que cada pessoa instale NavixX Desktop sem criar por conta própria um Secure MCP Tunnel, chave Runtime ou plugin privado. O **plugin público único** deverá usar MCP por HTTPS e OAuth 2.1, com usuário identificado e roteamento exclusivo ao dispositivo pareado. Consentimento do ChatGPT e autorização no Windows continuam obrigatórios.
