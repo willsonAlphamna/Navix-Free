@@ -10,7 +10,7 @@ if(!endpoint||!/^https:\/\/navixx-cloud-staging\.[a-z0-9-]+\.workers\.dev$/.test
   throw new Error('Informe a URL HTTPS EXATA do servidor de staging, nunca produção.');
 }
 const suffix=randomBytes(14).toString('base64url');
-const deviceId='smoke_'+suffix;
+const deviceId=process.env.NAVIX_TEST_DEVICE_ID||'smoke_'+suffix;
 const agentSecret=randomBytes(32).toString('base64url');
 const code=String(Math.floor(Math.random()*1e6)).padStart(6,'0');
 const verifier=randomBytes(32).toString('base64url');
