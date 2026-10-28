@@ -20,7 +20,7 @@ test('expõe 44 ferramentas com schemas reais sem argumentos arbitrários',()=>{
     assert.ok(tool.description);
     assert.deepEqual(tool.securitySchemes,[{type:'oauth2',scopes:['navix:control']}]);
   }
-  assert.match(MCP_INSTRUCTIONS,/Conector MCP do NavixX Desktop/);
+  assert.match(MCP_INSTRUCTIONS,/NavixX Desktop Cloud/);
 });
 test('inicialização e tools/list usam protocolo MCP Streamable HTTP',async()=>{
   const [status,body]=await invoke('initialize',{protocolVersion:'2025-06-18'});

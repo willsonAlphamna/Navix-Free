@@ -24,6 +24,9 @@ jobs:
       - name: Verificar pacote Cloudflare sem publicar
         run: npx wrangler deploy --dry-run
         working-directory: cloud
+      - name: Auditar HTTPS e OAuth do Cloudflare publicado (somente leitura)
+        run: node live-protocol-audit.mjs
+        working-directory: cloud
 
   windows_browser:
     runs-on: windows-latest

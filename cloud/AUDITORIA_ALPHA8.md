@@ -23,3 +23,6 @@
 - Não divulgar garantia de conexão contínua se o Windows estiver desligado, internet indisponível ou OAuth revogado.
 
 **Nenhuma alteração foi feita no ConectaX antigo.**
+
+## Verificação externa automatizada
+O fluxo de CI faz testes sem credenciais contra o servidor de staging para validar a disponibilidade HTTPS, descoberta OAuth, desafio 401 e página de autorização. Não envia comandos ao Windows nem utiliza códigos temporários reais.
