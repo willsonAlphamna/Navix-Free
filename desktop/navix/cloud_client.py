@@ -90,7 +90,7 @@ async def connect_once(settings, device_id, get_agent_secret, handler, websocket
     if websocket_connect is None:
         from websockets.asyncio.client import connect as websocket_connect
     endpoint = device_url(settings, device_id)
-    token = get_access_token()
+    token = get_agent_secret()
     if inspect.isawaitable(token):
         token = await token
     if not isinstance(token, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43,128}', token):
