@@ -2,6 +2,7 @@ import {DurableObject} from 'cloudflare:workers';
 import {authenticate, configFromEnv} from './auth.mjs';
 import {DurablePairing} from './durable-pairing.mjs';
 import {PendingCalls} from './relay-protocol.mjs';
+import {protectedResourceMetadata,oauthChallenge} from './oauth-resource.mjs';
 
 const DEVICE = /^[A-Za-z0-9_-]{16,128}$/;
 const json = (body,status=200) => new Response(JSON.stringify(body),{
@@ -41,8 +42,20 @@ export default {
     if(url.pathname==='/healthz' && request.method==='GET'){
       return json({service:'navixx-cloud',version:'0.3.0-alpha.2',public_tools_enabled:false});
     }
+    if(url.pathname==='/.well-known/oauth-protected-resource' && request.method==='GET'){
+      try{return json(protectedResourceMetadata(env,request.url));}
+      catch{return json({error:'Identidade não configurada'},503);}
+    }
     if(url.pathname==='/mcp'){
       // No public access until OAuth/OIDC + Windows consent + cross-user e2e tests.
+      try{configFromEnv(env);}catch{return json({error:'Identidade não configurada'},503);}
+      try{await authenticate(request,env,'navix:control');}
+      catch {
+        return new Response(JSON.stringify({error:'Não autorizado'}),{status:401,headers:{
+          'content-type':'application/json','cache-control':'no-store',
+          'www-authenticate':oauthChallenge(env,request.url),
+        }});
+      }
       return json({error:'MCP público ainda não habilitado'},503);
     }
     const route=url.pathname;
