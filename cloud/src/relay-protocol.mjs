@@ -1,5 +1,3 @@
-import {randomUUID} from 'node:crypto';
-
 /** The relay never infers permissions from a remote caller's arguments. */
 export const TOOL_NAMES = Object.freeze([
   'browser_back','browser_click','browser_close_tab','browser_download','browser_fill',
@@ -25,7 +23,7 @@ export function requiredPermission(tool) {
   return PERMISSIONS[tool.split('_')[0]];
 }
 
-export function makeCall({tool, args={}, id=randomUUID(), deadline=Date.now()+30_000}) {
+export function makeCall({tool, args={}, id=crypto.randomUUID(), deadline=Date.now()+30_000}) {
   requiredPermission(tool);
   if (!ID_RE.test(id)) throw new Error('ID de chamada inválido');
   if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('Argumentos inválidos');
@@ -33,12 +31,12 @@ export function makeCall({tool, args={}, id=randomUUID(), deadline=Date.now()+30
     throw new Error('Prazo de chamada inválido');
   }
   const payload = {kind:'call',id,tool,args,deadline};
-  if (Buffer.byteLength(JSON.stringify(payload)) > MAX_REQUEST_BYTES) throw new Error('Comando muito grande');
+  if (new TextEncoder().encode(JSON.stringify(payload)).length > MAX_REQUEST_BYTES) throw new Error('Comando muito grande');
   return payload;
 }
 
 export function parseReply(frame) {
-  if (typeof frame !== 'string' || Buffer.byteLength(frame) > MAX_RESPONSE_BYTES) {
+  if (typeof frame !== 'string' || new TextEncoder().encode(frame).length > MAX_RESPONSE_BYTES) {
     throw new Error('Resposta inválida ou excessiva');
   }
   let value;
@@ -71,7 +69,7 @@ export class PendingCalls {
     if (!Number.isInteger(timeoutMs) || timeoutMs<100 || timeoutMs>MAX_WAIT_MS) {
       throw new Error('Tempo excede limites');
     }
-    const id=randomUUID();
+    const id=crypto.randomUUID();
     const payload=makeCall({tool,args,id,deadline:this.now()+timeoutMs});
     return new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>{
