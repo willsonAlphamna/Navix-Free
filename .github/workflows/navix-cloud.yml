@@ -27,6 +27,9 @@ jobs:
       - name: Auditar HTTPS e OAuth do Cloudflare publicado (somente leitura)
         run: node live-protocol-audit.mjs
         working-directory: cloud
+      - name: Verificar formulário alpha.9 no canário sem tocar Windows
+        run: node live-pairing-portal-audit.mjs
+        working-directory: cloud
 
   windows_browser:
     runs-on: windows-latest
