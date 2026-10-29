@@ -61,6 +61,28 @@ export class DurablePairing {
     if (outcome.error) throw new Error(outcome.error);
     return outcome;
   }
+  /** Read-only proof that a code is still valid. Never claims ownership or
+   * issues an OAuth grant. Wrong guesses consume the same five-try budget.
+   */
+  async checkCode({deviceId,code}) {
+    if (typeof deviceId!=='string'||!DEVICE.test(deviceId)||
+        typeof code!=='string'||!CODE.test(code)) return false;
+    return this.storage.transaction(async txn=>{
+      const state=await txn.get('device');
+      if(!state||state.deviceId!==deviceId)return false;
+      const pending=state.ownerId?state.oauthChallenge:state;
+      if(!pending||pending.expiresAt<=this.now()||
+         pending.attempts>=this.maxAttempts)return false;
+      const valid=safe(await codeDigest(pending.salt,code),pending.codeHash);
+      if(valid)return true;
+      pending.attempts++;
+      if(pending.attempts>=this.maxAttempts){
+        if(state.ownerId){delete state.oauthChallenge;await txn.put('device',state);}
+        else await txn.delete('device');
+      } else await txn.put('device',state);
+      return false;
+    });
+  }
   /** One-time browser sign-in using the code shown on the consenting PC.
    * No email address, OpenAI key or shared account credential is required.
    */
