@@ -19,3 +19,16 @@ for(let i=0;i<50;i++){
 assert.ok(found>=1,`New portal never appeared: old=${old}, new=${found}`);
 console.log('LIVE CANARY OK: portal status=200, html fields verified, new=',found,'old=',old);
 console.log('Only GET was used; no code claim, OAuth token or Windows command.');
+
+const fakeId='audit_'+crypto.randomUUID().replaceAll('-','');
+const form=new URLSearchParams({device_id:fakeId,code:'000000'});
+const rejected=await fetch(origin+'/vincular',{
+  method:'POST',
+  headers:{'content-type':'application/x-www-form-urlencoded',
+           'origin':origin},
+  body:form,
+  signal:AbortSignal.timeout(12000),
+});
+assert.equal(rejected.status,400,'An unknown device/code must be rejected by the actual backend');
+assert.match(await rejected.text(),/incorreto, expirado ou bloqueado/);
+console.log('LIVE POST OK: fictitious device rejected (400), no OAuth grant, no Windows touched.');
