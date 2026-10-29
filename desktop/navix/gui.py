@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from .core import Session
@@ -678,6 +679,8 @@ class Panel:
             self._button(cloud_actions, 'Vincular ao ChatGPT', self.enroll_cloud,
                          tone='primary').pack(side='left', padx=(0, 8))
             self._button(cloud_actions, 'Reparar conexão Cloud', self.repair).pack(side='left')
+            self._button(pair, 'Abrir formulário de vínculo (ID + código)',
+                         self.open_cloud_pairing_page).pack(anchor='w', pady=(10, 0))
             self._text(pair, 'O Cloud dispensa chave Runtime no cofre e não usa o túnel antigo. '
                        'A confirmação inicial de vínculo no ChatGPT continua obrigatória.',
                        9, color=self.COLORS['subtle'], wraplength=530,
@@ -927,15 +930,18 @@ class Panel:
         self._cloud_pair_dialog=box
         box.title('NavixX Cloud — código temporário')
         box.configure(bg=self.COLORS['surface'])
-        box.geometry('580x340')
+        box.geometry('600x460')
+        content=ScrollableFrame(box,self.COLORS['surface'])
+        content.pack(fill='both',expand=True)
+        pane=content.content
         box.transient(self.root)
         box.lift()
-        self._text(box, 'Vincule seu PC à sua conta ChatGPT', 15, 'bold',
+        self._text(pane, 'Vincule seu PC à sua conta ChatGPT', 15, 'bold',
                    self.COLORS['cyan']).pack(pady=(15, 9))
         feedback=tk.StringVar(value='Use Copiar para transferir os valores sem digitá-los.')
         for name, value in [('ID do computador', data['device_id']),
                             ('Código de 6 dígitos (válido por 2 minutos)', data['verification_code'])]:
-            line=tk.Frame(box,bg=self.COLORS['surface'])
+            line=tk.Frame(pane,bg=self.COLORS['surface'])
             line.pack(fill='x',padx=12,pady=4)
             self._text(line,name,9,color=self.COLORS['subtle']).pack(anchor='w')
             # Windows Tk changes a readonly Entry's background to system white,
@@ -948,14 +954,15 @@ class Panel:
             self._button(line,'Copiar',lambda value=value:
                          self._copy_cloud_value(value,feedback)).pack(
                 side='left',padx=(7,0))
-        tk.Label(box,textvariable=feedback,bg=self.COLORS['surface'],
+        tk.Label(pane,textvariable=feedback,bg=self.COLORS['surface'],
                  fg=self.COLORS['green'],font=('Segoe UI',9)).pack(pady=(7,2))
-        self._text(box, 'PRIMEIRO ACESSO: no ChatGPT, conecte o plugin NavixX Desktop Cloud. Na página de autorização, '
-                   'cole o ID e o código e confirme. Se o plugin negar acesso (401), '
-                   'reautorize-o no ChatGPT; o PC não pode conceder essa permissão sozinho.',
+        self._button(pane,'Abrir página para digitar ID e código',
+                     self.open_cloud_pairing_page,tone='primary').pack(fill='x',padx=12,pady=(8,4))
+        self._text(pane, 'O formulário verifica os dados na nuvem; depois, conclua a autorização '
+                   'OAuth no plugin NavixX Desktop Cloud no ChatGPT. A verificação isolada não concede acesso.',
                    9,color=self.COLORS['subtle'],wraplength=545).pack(pady=4)
         countdown=tk.StringVar(value='Código válido por até 2 minutos.')
-        tk.Label(box,textvariable=countdown,bg=self.COLORS['surface'],
+        tk.Label(pane,textvariable=countdown,bg=self.COLORS['surface'],
                  fg=self.COLORS['cyan'],font=('Segoe UI',9,'bold')).pack(pady=(3,2))
 
         def refresh_countdown():
@@ -967,6 +974,27 @@ class Panel:
             if remaining:
                 box.after(1000,refresh_countdown)
         box.after(0,refresh_countdown)
+
+    def open_cloud_pairing_page(self):
+        """Open the first-time code form at the SAME verified Cloud endpoint.
+
+        This only verifies a short-lived code, never grants OAuth permission.
+        The ChatGPT plugin must still complete its own authorization.
+        """
+        if not self.cloud_controller:
+            self.show('NavixX Cloud não configurado neste instalador.')
+            return
+        try:
+            from .cloud_pair import PairingHttpClient
+            url=PairingHttpClient(self.cloud_controller.settings).base+'/vincular'
+            if not webbrowser.open(url,new=2):
+                self.root.clipboard_clear()
+                self.root.clipboard_append(url)
+                self.show('Navegador indisponível. Link seguro copiado para colar na barra de endereço.')
+                return
+            self.show('Formulário de vínculo aberto no navegador. Verifique o código e autorize pelo plugin ChatGPT.')
+        except (ValueError,OSError,RuntimeError) as error:
+            self.show('Não foi possível abrir o formulário: '+str(error))
 
     def _copy_cloud_value(self,value,feedback=None):
         self.root.clipboard_clear()
