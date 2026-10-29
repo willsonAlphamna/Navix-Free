@@ -1,7 +1,7 @@
 name: NavixX 0.3 - Windows Cloud Preview (isolado)
 on:
   push:
-    branches: [codex/navixx-cloud-alpha7-visible-pairing, codex/navixx-cloud-audit-alpha8]
+    branches: [codex/navixx-cloud-alpha7-visible-pairing, codex/navixx-cloud-audit-alpha8, codex/navixx-cloud-alpha9-vinculacao-clara]
     paths: ['desktop/**', '.github/workflows/navix-cloud-preview-windows.yml']
   workflow_dispatch:
 permissions:
@@ -50,7 +50,7 @@ jobs:
           $check = Start-Process dist\NavixDesktop\NavixDesktop.exe -ArgumentList '--self-test', $report -Wait -PassThru
           Get-Content $report
           if ($check.ExitCode -ne 0) { throw 'Autoteste empacotado falhou' }
-      - name: Gerar instalador independente de 0.2.11
+      - name: Gerar instalador Cloud Preview isolado do Navix 0.2.11
         shell: pwsh
         run: |
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer-cloud-preview.iss
@@ -61,7 +61,7 @@ jobs:
       - name: Testar instalacao e desinstalacao sem tocar Navix 0.2.11
         shell: pwsh
         run: |
-          $installer = 'output-cloud-preview\NavixDesktop-CloudPreview-Setup-0.3.0-alpha.8.exe'
+          $installer = 'output-cloud-preview\NavixDesktop-CloudPreview-Setup-0.3.0-alpha.9.exe'
           $install = Start-Process $installer -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalacao do preview falhou' }
           $path = "$env:LOCALAPPDATA\Programs\NavixDesktopCloudPreview"
