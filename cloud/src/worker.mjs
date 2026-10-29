@@ -82,7 +82,7 @@ export default {
       try{
         form=await parseForm(request);
         deviceId=form.get('device_id');code=form.get('code');
-        if(!deviceId||!DEVICE.test(deviceId)||!/^\\d{6}$/.test(code||'')){
+        if(!deviceId||!DEVICE.test(deviceId)||!/^\d{6}$/.test(code||'')){
           return htmlResponse(pairingEntryPage({error:'Confira o ID e o código de seis números.'}),400);
         }
       }catch{return htmlResponse(pairingEntryPage({error:'Dados do formulário inválidos.'}),400);}
