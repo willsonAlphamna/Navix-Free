@@ -90,6 +90,7 @@ class CloudGuiTests(unittest.TestCase):
         with patch('navix.gui.tk.Toplevel'), patch('navix.gui.tk.Frame'), \
              patch('navix.gui.tk.Label') as label, \
              patch('navix.gui.tk.Entry') as entry, \
+             patch('navix.gui.ScrollableFrame'), \
              patch('navix.gui.tk.StringVar'):
             Panel._cloud_code_dialog(panel,data)
         labels=[call.kwargs for call in label.call_args_list]
@@ -98,6 +99,24 @@ class CloudGuiTests(unittest.TestCase):
         self.assertTrue(any(item.get('text')==data['verification_code'] and
                             item.get('fg')==Panel.COLORS['text'] for item in labels))
         entry.assert_not_called()
+
+    def test_pairing_page_button_opens_the_same_cloud_host(self):
+        panel=self.panel()
+        with patch('navix.cloud_pair.PairingHttpClient') as client, \
+             patch('navix.gui.webbrowser.open', return_value=True) as opener:
+            client.return_value.base='https://navixx.example.workers.dev'
+            Panel.open_cloud_pairing_page(panel)
+        opener.assert_called_once_with(
+            'https://navixx.example.workers.dev/vincular',new=2)
+
+    def test_pairing_page_falls_back_to_copy_link(self):
+        panel=self.panel()
+        with patch('navix.cloud_pair.PairingHttpClient') as client, \
+             patch('navix.gui.webbrowser.open', return_value=False):
+            client.return_value.base='https://navixx.example.workers.dev'
+            Panel.open_cloud_pairing_page(panel)
+        panel.root.clipboard_append.assert_called_once_with(
+            'https://navixx.example.workers.dev/vincular')
 
     def test_copy_code_confirms_it_was_copied(self):
         panel=self.panel()
