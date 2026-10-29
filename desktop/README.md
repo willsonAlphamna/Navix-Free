@@ -1,5 +1,13 @@
 # NavixX Desktop — pré-lançamento Windows
 
+## Nova interface alpha.9: formulário de ID + código
+
+Na tela **Permissões**, clique em **Vincular ao ChatGPT**. A janela agora é rolável, mostra ID e código e tem um botão **Abrir página para digitar ID e código**. O navegador abre o endereço HTTPS da **mesma nuvem configurada no aplicativo**, rota `/vincular`, sem transportar o código pela URL. O site valida os dados de seis números contra o pareamento temporário no servidor. Código errado ou expirado é recusado com limite de tentativas.
+
+**Atenção:** essa validação inicial NÃO substitui o consentimento OAuth do ChatGPT: depois é necessário abrir o plugin NavixX Desktop Cloud no ChatGPT e concluir a autorização na página que ele apresentar. Sem a etapa OAuth, o Windows permanece inacessível ao ChatGPT. Não use o ConectaX antigo, nem crie novas chaves. A versão no GitHub não entra no programa já instalado até a entrega e instalação de um novo executável.
+
+
+
 ## NavixX Cloud Preview 0.3.0-alpha.7 — vínculo legível e reconexão
 
 Correção observada no Windows: os campos de identificação e código apareciam
