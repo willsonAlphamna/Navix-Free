@@ -4,6 +4,7 @@ import {PendingCalls,TOOL_SET} from './relay-protocol.mjs';
 import {DeviceOAuth,authMetadata,authorizationParams,htmlResponse,oauthRedirect,
   pairingPage,parseForm,resourceFor,splitCredential,CLIENT_ID,CALLBACK,SCOPE} from './device-oauth.mjs';
 import {handleMcp,validateToolArguments,authenticationRequired} from './mcp-http.mjs';
+import {pairingEntryPage} from './pairing-entry.mjs';
 
 const DEVICE = /^[A-Za-z0-9_-]{16,128}$/;
 const json = (body,status=200) => new Response(JSON.stringify(body),{
@@ -62,7 +63,7 @@ export default {
   async fetch(request,env) {
     const url=new URL(request.url);
     if(url.pathname==='/healthz' && request.method==='GET'){
-      return json({service:'navixx-cloud',version:'0.3.0-alpha.8',
+      return json({service:'navixx-cloud',version:'0.3.0-alpha.9',
         public_tools_enabled:publicControlEnabled(env),
         restricted_to_canary:Boolean(env.NAVIX_TEST_DEVICE_ID)});
     }
@@ -73,6 +74,33 @@ export default {
     }
     if(url.pathname==='/.well-known/oauth-authorization-server' && request.method==='GET'){
       return json(authMetadata(url.origin));
+    }
+    if(url.pathname==='/vincular'){
+      if(request.method==='GET')return htmlResponse(pairingEntryPage());
+      if(request.method!=='POST')return json({error:'Método inválido'},405);
+      let form,deviceId,code;
+      try{
+        form=await parseForm(request);
+        deviceId=form.get('device_id');code=form.get('code');
+        if(!deviceId||!DEVICE.test(deviceId)||!/^\d{6}$/.test(code||'')){
+          return htmlResponse(pairingEntryPage({error:'Confira o ID e o código de seis números.'}),400);
+        }
+      }catch{return htmlResponse(pairingEntryPage({error:'Dados do formulário inválidos.'}),400);}
+      if(!env.PAIR_RATE_LIMITER)return htmlResponse(pairingEntryPage({
+        error:'Verificação temporariamente indisponível. Não é necessário criar outra chave.'
+      }),503);
+      const ip=request.headers.get('cf-connecting-ip')||'unknown';
+      const {success}=await env.PAIR_RATE_LIMITER.limit({key:'pair-check:'+ip});
+      if(!success)return htmlResponse(pairingEntryPage({
+        error:'Limite de tentativas atingido. Aguarde antes de tentar novamente.'
+      }),429);
+      const response=await stubFor(env,deviceId).fetch(new Request('https://device.local/pair/check',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({deviceId,code}),
+      }));
+      return htmlResponse(pairingEntryPage(response.ok?
+        {verified:true,deviceId}:{error:'ID ou código incorreto, expirado ou bloqueado.',deviceId}),
+        response.ok?200:400);
     }
     if(url.pathname==='/oauth/authorize'){
       if(!['GET','POST'].includes(request.method))return json({error:'Método inválido'},405);
@@ -272,6 +300,14 @@ export class DeviceRelay extends DurableObject {
         const data=await request.json();
         return json(await this.pairing.start(data),201);
       } catch{return json({error:'Pareamento indisponível'},409);}
+    }
+    if(route==='/pair/check'){
+      if(request.method!=='POST')return json({error:'Método inválido'},405);
+      try{
+        const data=await request.json();
+        if(await this.pairing.checkCode(data))return json({valid:true});
+      }catch{}
+      return json({error:'Código não confirmado'},400);
     }
     if(route==='/pair/renew'){
       try {

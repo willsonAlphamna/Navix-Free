@@ -120,3 +120,32 @@ test('status de token correto só confirma pareamento depois da aprovação',asy
   await pair.approve({ownerId:ownerA,deviceId,code});
   assert.deepEqual(await pair.status({deviceId,agentSecret:secret}),{linked:true});
 });
+
+test('formulário verifica um código real sem vincular ou liberar controle',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  assert.equal(await pair.checkCode({deviceId,code}),true);
+  assert.equal(await pair.verifyAgent(secret),false);
+  assert.equal(await pair.verifyOwner(ownerA),false);
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  assert.equal(await pair.verifyAgent(secret),true);
+});
+test('formulário recusa cinco palpites e código vencido sem emitir vínculo',async()=>{
+  const first=make();
+  await first.pair.start({deviceId,code,agentSecret:secret});
+  for(let i=0;i<5;i++)assert.equal(await first.pair.checkCode({deviceId,code:'999999'}),false);
+  assert.equal(await first.pair.checkCode({deviceId,code}),false);
+  assert.equal(await first.pair.verifyAgent(secret),false);
+  const second=make();
+  await second.pair.start({deviceId,code,agentSecret:secret});
+  second.advance(120001);
+  assert.equal(await second.pair.checkCode({deviceId,code}),false);
+});
+test('formulário aceita código renovado sem revogar titular, OAuth ainda necessário',async()=>{
+  const {pair}=make();
+  await pair.start({deviceId,code,agentSecret:secret});
+  await pair.approve({ownerId:ownerA,deviceId,code});
+  await pair.renewCode({deviceId,agentSecret:secret,code:'112233'});
+  assert.equal(await pair.checkCode({deviceId,code:'112233'}),true);
+  assert.equal(await pair.verifyOwner(ownerA),true);
+});

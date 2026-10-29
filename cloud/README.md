@@ -95,3 +95,8 @@ Documentações:
 
 **Não ativar `/mcp` por simples remoção do 503:** isso exporia execução de
 comandos sem os pré-requisitos de segurança acima.
+
+
+### Alpha.9 — página de código verificável
+
+A rota `GET /vincular` mostra os campos ID do computador e código de seis dígitos. `POST /vincular` valida o código no mesmo Durable Object de pareamento, sob rate limit por IP e no máximo cinco palpites por dispositivo. Não coloca códigos em URLs nem concede tokens ou controle remoto; uma resposta positiva significa **somente que o código ainda é válido**. Para vincular o ChatGPT, ainda é obrigatório iniciar e concluir OAuth/PKCE pelo plugin no ChatGPT (que exibe o formulário de autorização real). O botão no Windows abre o formulário da própria origem HTTPS configurada. A integração não pode provar acesso ao Windows sem uma chamada MCP autorizada; CI e testes não equivalem a esse teste ponta a ponta.
