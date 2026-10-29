@@ -1,0 +1,42 @@
+name: NavixX Cloud alpha.9 - publicar instalador validado
+on:
+  push:
+    branches: [codex/navixx-cloud-alpha9-vinculacao-clara]
+    paths: ['.github/workflows/navix-cloud-alpha9-release.yml']
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Baixar pacote do Windows CI aprovado
+        uses: actions/download-artifact@v4
+        with:
+          name: NavixX-0.3-CloudPreview-Windows
+          run-id: 40804169744
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release
+      - name: Validar instalador e resumo de testes SHA-256
+        run: |
+          set -euo pipefail
+          installer='release/NavixDesktop-CloudPreview-Setup-0.3.0-alpha.9.exe'
+          test -s "$installer"
+          test -s release/SHA256.txt
+          test -s release/packaged-selftest.json
+          expected="$(sha256sum "$installer" | cut -d ' ' -f 1)"
+          grep -qi "$expected" release/SHA256.txt
+          python3 -m json.tool release/packaged-selftest.json > /dev/null
+          echo "Instalador alpha.9 e SHA-256 conferidos."
+      - name: Publicar release de pré-lançamento
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create navixx-cloud-v0.3.0-alpha.9-preview release/* \
+            --target '2fc98cbb7eb708c795876e6d14baf96f491eb2fb' \
+            --prerelease --latest=false \
+            --title 'NavixX Desktop Cloud Preview 0.3.0-alpha.9 (Windows)' \
+            --notes 'PR #15. Corrige a ausência de uma página para inserir ID e código temporário do computador; botão no Windows abre o portal HTTPS /vincular; a página confirma código via Cloudflare e bloqueia tentativas incorretas. Pacote gerado no CI Windows 40804169744, com testes Python, instalação, desinstalação, autoteste e arquivo SHA-256. ATENÇÃO: validação do código NÃO equivale a OAuth nem prova conexão real com Windows pelo ChatGPT; essa etapa depende de consentimento individual no plugin. Pré-lançamento NÃO ASSINADO. ConectaX e NavixX Desktop antigo não são modificados.'
