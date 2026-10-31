@@ -1,10 +1,10 @@
 name: Navix Desktop - Windows piloto
 on:
   push:
-    branches: [feature/navix-desktop-zero, codex/navix-desktop-full-tools]
+    branches: [feature/navix-desktop-zero, codex/navix-desktop-full-tools, fix/navix-desktop-0.2.12-background]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   pull_request:
-    branches: [feature/navix-desktop-zero]
+    branches: [feature/navix-desktop-zero, fix/navix-desktop-0.2.12-background]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
 concurrency:
@@ -101,7 +101,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.11.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.12.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -134,7 +134,7 @@ jobs:
   publish_windows:
     name: Publicar instalador público (pré-lançamento)
     needs: windows
-    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/navix-desktop-full-tools'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/navix-desktop-0.2.12-background'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -146,7 +146,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.11.exe
+          test -s release/NavixDesktop-Setup-0.2.12.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -155,8 +155,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.11 release/* \
+          gh release create navix-desktop-v0.2.12 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.11 — Diagnóstico de túnel e recuperação automática" \
-            --notes "NavixX Desktop 0.2.11: distingue processo local ativo de prontidão do túnel e confirmação real de chamada ChatGPT; adiciona verificações oficiais de saúde em segundo plano, informa degradação do plano de controle, reinicia um cliente de túnel travado, tenta recuperar falhas transitórias com espera progressiva e usa o botão Reparar conexão para reiniciar o túnel sem pedir novamente a chave da sessão atual. Instalação oferece abertura opcional do painel no login do Windows, desmarcada por padrão; não concede autorização remota automaticamente. Preserva menu azul-petróleo, identidade visual, proteção local, logs e desinstalador. Um plugin cuja sessão expirou no ChatGPT ainda pode exigir nova autorização no ChatGPT. PRÉ-LANÇAMENTO NÃO ASSINADO: o teste ponta a ponta depende do Windows do usuário; Android/iOS e publicação nas lojas pendentes." \
+            --title "NavixX Desktop 0.2.12 — Estabilidade em segundo plano (experimental)" \
+            --notes "Correção experimental da linha NavixX Desktop 0.2.11: supervisão de reconexão independente da janela, tolerância a falhas transitórias de saúde local, e testes adicionais. Instalador pré-lançamento não assinado, derivado da tag v0.2.11. Não altera o NavixX Cloud 0.3. Validação automática no runner Windows não garante validação no PC do usuário; preservar logs, fechar 0.2.11 antes de instalar e testar minimização por período prolongado." \
             --prerelease
