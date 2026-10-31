@@ -23,6 +23,8 @@ from urllib import request as urlrequest
 
 TUNNEL_ID = re.compile(r'^tunnel_[a-fA-F0-9]{32}$')
 _BACKOFF = (3, 8, 20, 45, 90)
+# Do not tear down a live tunnel for short local scheduling/network stalls.
+_HEALTH_RESTART_MIN_SECONDS = 120
 
 
 def _local_health_base(url):
@@ -205,6 +207,8 @@ class TunnelManager:
         self.health_url_file = None
         self.health_state = 'unknown'
         self._health_process = None
+        self._supervisor_generation = 0
+        self._supervisor_thread = None
 
     def _clear_health_file(self):
         path = self.health_url_file
@@ -215,9 +219,40 @@ class TunnelManager:
             except OSError:
                 pass
 
+    def start_supervisor(self):
+        """Keep authorized reconnection independent of Tk/window visibility."""
+        with self.lock:
+            if not self.enabled:
+                return False
+            if self._supervisor_thread is not None and self._supervisor_thread.is_alive():
+                return True
+            self._supervisor_generation += 1
+            generation = self._supervisor_generation
+            worker = threading.Thread(target=self._supervise, args=(generation,),
+                                      daemon=True, name='NavixTunnelSupervisor')
+            self._supervisor_thread = worker
+            worker.start()
+            return True
+
+    def _supervise(self, generation):
+        """Only retry using an already authorized local session."""
+        while True:
+            with self.lock:
+                if not self.enabled or generation != self._supervisor_generation:
+                    return
+            try:
+                state = self.check()
+                if state == 'reconectar' and self.service.ready:
+                    self.connect()
+            except (OSError, RuntimeError, ValueError, KeyError, AttributeError):
+                # Keep the supervisor alive; never persist credentials/exceptions.
+                self._event('supervisor_retry_failed', 'warning')
+            time.sleep(2)
+
     def _health_watch(self, process):
         """Background-only checks: GUI ticks never wait on network requests."""
         failures = 0
+        first_failure_at = None
         while True:
             with self.lock:
                 if self.process is not process or not self.enabled:
@@ -239,15 +274,22 @@ class TunnelManager:
                     return
                 previous = self.health_state
                 self.health_state = state
+                now = self.clock()
                 if state == 'health_failed' and base:
                     failures += 1
+                    if first_failure_at is None:
+                        first_failure_at = now
                 else:
                     failures = 0
+                    first_failure_at = None
                 if state != previous:
                     self._event('health_' + state, 'warning' if state in ('health_failed', 'remote_degraded') else 'ok')
-                # Restart only a previously discoverable health listener that
-                # stays unreachable. An older client lacking this API is not killed.
-                if failures >= 3 and self.clock() - start >= 20:
+                # A live client must remain up through transient loopback timeouts.
+                # Restart only after sustained failures; never treat a single
+                # slow/minimized UI interval as proof that the tunnel is dead.
+                if (failures >= 3 and first_failure_at is not None and
+                        now - first_failure_at >= _HEALTH_RESTART_MIN_SECONDS and
+                        now - start >= _HEALTH_RESTART_MIN_SECONDS):
                     self._terminate()
                     self.error = 'O cliente deixou de responder às verificações locais de saúde.'
                     self.attempts += 1
@@ -444,6 +486,8 @@ class TunnelManager:
     def stop(self):
         with self.lock:
             self.enabled = False
+            self._supervisor_generation += 1
+            self._supervisor_thread = None
             self._terminate()
             self.api_key = ''
             self.connected_url = ''

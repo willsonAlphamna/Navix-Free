@@ -475,6 +475,7 @@ class Panel:
         """User-initiated from wizard; credentials stay out of argv/log files."""
         self.tunnel_settings.save(tunnel_id, api_key, remember=remember)
         self.tunnel.configure(tunnel_id, api_key)
+        self.tunnel.start_supervisor()
         self._launch_tunnel_worker()
 
     def disconnect_tunnel(self):
@@ -842,6 +843,7 @@ class Panel:
             key = self.tunnel_settings.load_key()
             if tunnel_id and key:
                 self.tunnel.configure(tunnel_id, key)
+                self.tunnel.start_supervisor()
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
@@ -953,8 +955,7 @@ class Panel:
                                     'info' if health[0] else 'warning',
                                     code='LOCAL_READY' if health[0] else 'LOCAL_NOT_READY')
             self._last_health = health
-        if tunnel_state == 'reconectar' and not self._tunnel_worker_running:
-            self._launch_tunnel_worker()
+        # The tunnel supervisor retries independently of GUI updates/minimization.
         if status['active'] and self.service.ready:
             self.state.set('LOCAL PRONTO — sessão sem prazo' if status.get('unlimited') else
                            'LOCAL PRONTO — sessão autorizada: %ds' % status['remaining_seconds'])

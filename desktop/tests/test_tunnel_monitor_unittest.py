@@ -144,6 +144,49 @@ class TunnelReliabilityTests(unittest.TestCase):
         tunnel.last_reason = 'Credencial do túnel recusada (401).'
         self.assertEqual(tunnel.check(), 'falha: intervenção necessária')
 
+    def test_short_probe_stall_does_not_kill_running_tunnel(self):
+        tunnel = self.make_tunnel()
+        current_time = [1000]
+        tunnel.clock = lambda: current_time[0]
+        with mock.patch('navix.tunnel_manager.threading.Thread'):
+            tunnel.connect()
+        process = self.process
+
+        def advance(_):
+            current_time[0] += 10
+            if current_time[0] >= 1080:
+                tunnel.enabled = False
+
+        with mock.patch.object(Path, 'read_text',
+                               return_value='http://127.0.0.1:42/healthz'), \
+                mock.patch('navix.tunnel_manager._health_snapshot',
+                           return_value='health_failed'), \
+                mock.patch('navix.tunnel_manager.time.sleep',
+                           side_effect=advance):
+            tunnel._health_watch(process)
+        self.assertFalse(process.dead, 'A transient local stall must not restart a live client')
+        self.assertEqual(tunnel.attempts, 0)
+        tunnel.stop()
+
+    def test_background_supervisor_retries_without_gui_tick(self):
+        tunnel = self.make_tunnel()
+        generation = 7
+        tunnel._supervisor_generation = generation
+        attempts = []
+
+        def connect():
+            attempts.append('retry')
+
+        def sleep(_):
+            tunnel._supervisor_generation += 1
+
+        with mock.patch.object(tunnel, 'check', return_value='reconectar'), \
+                mock.patch.object(tunnel, 'connect', side_effect=connect), \
+                mock.patch('navix.tunnel_manager.time.sleep', side_effect=sleep):
+            tunnel._supervise(generation)
+        self.assertEqual(attempts, ['retry'])
+        tunnel.stop()
+
     def test_unresponsive_health_listener_restarts_client_with_backoff(self):
         tunnel = self.make_tunnel()
         current_time = [1000]
