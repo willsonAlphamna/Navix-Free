@@ -36,6 +36,13 @@ A ponte aceita comandos de ate 35 segundos, argumentos de ate 48 KB e respostas
 de ate 1,9 MB. Tarefas longas podem ser iniciadas em segundo plano e consultadas.
 Se houver timeout depois do envio, o resultado e incerto: nao repita cegamente.
 A reconexao repete o envio de um resultado pendente, nunca o comando do Windows.
+O agente aguarda cinco segundos entre consultas sem trabalho, evitando excesso de
+requisicoes. Erros temporarios usam espera exponencial com variacao aleatoria,
+respeitando o cabecalho Retry-After (incluindo HTTP 429). Resultados pendentes
+passam a ser armazenados com protecao DPAPI no mesmo usuario Windows e sao
+reenviados apos reiniciar o aplicativo, ate confirmacao ou expiracao. Isso nao
+repete comandos ou cliques remotos. Um resultado corrompido ou pertencente a
+outro dispositivo e ignorado; o arquivo original e preservado para diagnostico.
 A fila permite no maximo uma chamada em andamento por PC.
 
 A ponte armazena temporariamente comandos e resultados por ate cinco minutos;
@@ -53,3 +60,20 @@ fila com resposta em blocos. Testes locais de integracao: porta/token atuais,
 parada/retomada e segredo fora de logs. A suite Windows existente e os testes de
 instalacao/desinstalacao rodam no CI. Essas evidencias nao substituem o teste real
 ChatGPT -> computador do Wilson.
+
+## Continuidade e limites da disponibilidade
+
+O ajuste reduz riscos de HTTP 429 causado por consultas muito frequentes no
+proprio AdminBridge, mas nao elimina limites impostos pelo ChatGPT/MCP,
+Cloudflare, rede local, energia ou autorizacao do usuario. O erro 429 no
+gateway ConectaX antigo nao e corrigido por esta ponte de outro servico.
+Nao ha failover para outro Worker sem demonstrar armazenamento, identidade
+e fila compartilhados: alternar para uma ponte sem o mesmo estado pode
+duplicar ou perder comandos. Antes de habilitar um caminho redundante,
+validar dois enderecos contra a **mesma** fila protegida, revogacao,
+permissoes e auditoria em teste de corte de conexao.
+
+Nao ha tolerancia a falhas completa: se o processo for encerrado durante uma
+acao Windows, nao e possivel saber com certeza se ela foi executada. Nesse
+caso, a ponte nao repete automaticamente. A retomada depende de sessao
+local autorizada e de novo contato com o servico.
