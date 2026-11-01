@@ -36,7 +36,7 @@ A ponte aceita comandos de ate 35 segundos, argumentos de ate 48 KB e respostas
 de ate 1,9 MB. Tarefas longas podem ser iniciadas em segundo plano e consultadas.
 Se houver timeout depois do envio, o resultado e incerto: nao repita cegamente.
 A reconexao repete o envio de um resultado pendente, nunca o comando do Windows.
-O agente aguarda cinco segundos entre consultas sem trabalho, evitando excesso de
+O agente aguarda dez segundos entre consultas sem trabalho, evitando excesso de
 requisicoes. Erros temporarios usam espera exponencial com variacao aleatoria,
 respeitando o cabecalho Retry-After (incluindo HTTP 429). Resultados pendentes
 passam a ser armazenados com protecao DPAPI no mesmo usuario Windows e sao
