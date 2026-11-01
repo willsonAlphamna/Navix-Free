@@ -62,4 +62,58 @@ class BridgeTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_TOKEN',''.join(messages))
         self.assertEqual(calls,['https://bridge/setup#ONE_TIME_SECRET'])
 
+    def test_successful_idle_poll_waits_to_prevent_429(self):
+        session=Session(self.path)
+        bridge=mod.AdminBridge(session,lambda:types.SimpleNamespace(port=1,ready=True))
+        bridge.enabled.set()
+        bridge.credentials={'device_id':'abc','agent_token':'secret'}
+        bridge.tools=[{'name':'status'}]
+        calls=[]
+        bridge._cloud=lambda path,data:calls.append(path) or {}
+
+        class StopAfterWait:
+            def __init__(self):self.stopped=False;self.waits=[]
+            def is_set(self):return self.stopped
+            def wait(self,seconds):self.waits.append(seconds);self.stopped=True;return True
+
+        bridge.halt=StopAfterWait()
+        bridge._run()
+        self.assertEqual(calls,['/device/poll'])
+        self.assertEqual(bridge.halt.waits,[5])
+
+    def test_retry_after_429_and_exponential_jitter(self):
+        from urllib.error import HTTPError
+        with patch.object(mod.random,'uniform',return_value=0):
+            err=HTTPError('https://cloud',429,'Rate limited',{'Retry-After':'90'},None)
+            self.assertEqual(mod.AdminBridge._retry_delay(5,err),90)
+            self.assertEqual(mod.AdminBridge._retry_delay(5),10)
+            self.assertEqual(mod.AdminBridge._retry_delay(100),120)
+
+    def test_persist_result_without_reexecuting_remote_job(self):
+        credentials={'device_id':'abc','agent_token':'secret'}
+        bridge=mod.AdminBridge(Session(self.path),lambda:None)
+        bridge.secret.write_bytes(json.dumps(credentials).encode())
+        bridge.credentials=credentials
+        expected={'job_id':'job:abc:123','result':{'content':[{'type':'text','text':'ok'}]}}
+        bridge.pending_result=expected
+        bridge._persist_pending()
+
+        recovered=mod.AdminBridge(Session(self.path),lambda:None)
+        recovered._load()
+        self.assertEqual(recovered.pending_result,expected)
+        self.assertTrue(recovered.pending_file.exists())
+        recovered._clear_pending()
+        self.assertIsNone(recovered.pending_result)
+        self.assertFalse(recovered.pending_file.exists())
+
+    def test_pending_result_from_another_device_is_not_adopted(self):
+        credentials={'device_id':'abc','agent_token':'secret'}
+        bridge=mod.AdminBridge(Session(self.path),lambda:None)
+        bridge.secret.write_bytes(json.dumps(credentials).encode())
+        payload={'device_id':'other','pending':{'job_id':'job:other:x','result':{}}}
+        bridge.pending_file.write_bytes(json.dumps(payload).encode())
+        bridge._load()
+        self.assertIsNone(bridge.pending_result)
+        self.assertTrue(bridge.pending_file.exists())
+
 if __name__=='__main__':unittest.main()
