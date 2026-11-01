@@ -1,8 +1,11 @@
 """Cloud bridge inside Navix Desktop 0.2.12; uses its real session and MCP tools."""
 import ctypes
 import json
+import random
 import os
 from pathlib import Path
+from email.utils import parsedate_to_datetime
+from datetime import datetime, timezone
 import threading
 import time
 from urllib import request, error
@@ -19,6 +22,7 @@ class AdminBridge:
         self.service_getter = service_getter
         self.notify = notify
         self.secret = Path(session.directory) / 'admin-bridge.dpapi'
+        self.pending_file = Path(session.directory) / 'admin-bridge-pending.dpapi'
         self.halt = threading.Event()
         self.enabled = threading.Event()
         self.thread = None
@@ -60,6 +64,56 @@ class AdminBridge:
             self.credentials = json.loads(_dpapi(self.secret.read_bytes(), False).decode())
             if not isinstance(self.credentials.get('agent_token'), str):
                 raise ValueError('Credencial protegida invalida')
+
+        # Persist the result, never the remote command. An interrupted upload can
+        # be repeated safely, while a Windows action must not be executed twice.
+        if self.pending_file.exists():
+            try:
+                envelope = json.loads(_dpapi(self.pending_file.read_bytes(), False).decode())
+                pending = envelope.get('pending')
+                device = self.credentials.get('device_id') if self.credentials else None
+                if (device is not None and envelope.get('device_id') == device
+                        and isinstance(pending, dict)
+                        and isinstance(pending.get('job_id'), str)
+                        and pending['job_id'].startswith('job:' + device + ':')
+                        and isinstance(pending.get('result'), dict)):
+                    self.pending_result = pending
+                else:
+                    self._state('Resultado antigo de outro PC ignorado; nenhuma acao sera repetida.')
+            except (OSError, ValueError, TypeError, KeyError):
+                self._state('Resultado pendente nao pode ser lido; nenhuma acao sera repetida.')
+
+    def _persist_pending(self):
+        if not self.credentials or not self.pending_result:
+            return
+        envelope = {'device_id': self.credentials['device_id'],
+                    'pending': self.pending_result}
+        protected = _dpapi(json.dumps(envelope).encode(), True)
+        temp = self.pending_file.with_suffix('.tmp')
+        temp.write_bytes(protected)
+        temp.replace(self.pending_file)
+
+    def _clear_pending(self):
+        # A 200 ack or explicit 410 expiry is required before deleting locally.
+        self.pending_file.unlink(missing_ok=True)
+        self.pending_result = None
+
+    @staticmethod
+    def _retry_delay(previous, exc=None):
+        """Exponential backoff + jitter; honor HTTP Retry-After (seconds or date)."""
+        base = min(120, max(5, previous * 2))
+        header = exc.headers.get('Retry-After') if exc is not None and exc.headers else None
+        if header:
+            try:
+                retry_seconds = max(0, int(header))
+            except (TypeError, ValueError):
+                try:
+                    retry_seconds = max(0, (parsedate_to_datetime(header)
+                         - datetime.now(timezone.utc)).total_seconds())
+                except (TypeError, ValueError, OverflowError):
+                    retry_seconds = 0
+            base = max(base, min(3600, retry_seconds))
+        return base + random.uniform(0, min(5, base * .1))
 
     def _enroll(self):
         enrollment = self._cloud('/device/register', {'name': os.environ.get('COMPUTERNAME', 'Meu Windows')}, False)
@@ -115,7 +169,7 @@ class AdminBridge:
                     self.tools = self._local({'jsonrpc':'2.0', 'id':1, 'method':'tools/list'})['tools']
                 if self.pending_result:
                     self._cloud('/device/result', self.pending_result)
-                    self.pending_result = None
+                    self._clear_pending()
                 snapshot = self.session.status()
                 snapshot.update({'administrator':bool(ctypes.windll.shell32.IsUserAnAdmin()) if os.name=='nt' else False,
                                  'bridge_version':BRIDGE_VERSION, 'native_navix':True})
@@ -135,16 +189,21 @@ class AdminBridge:
                     if len(json.dumps(result)) > 1_900_000:
                         result = {'isError':True,'content':[{'type':'text','text':'Resultado excede o limite de 1,9 MB. Reduza a captura ou leia arquivos menores.'}]}
                     self.pending_result = {'job_id':reply['job_id'], 'result':result}
+                    self._persist_pending()
                     continue
+                # Without this idle pause the worker is flooded with polls and
+                # may respond 429 even while the PC and tunnel are healthy.
+                self.halt.wait(5)
             except error.HTTPError as exc:
                 if self.pending_result and exc.code == 410:
-                    self.pending_result = None
+                    self._clear_pending()
+                    self._state('Resultado expirado na nuvem; a acao nao sera repetida.')
                 if exc.code in (401, 403):
                     self._state('Ponte recusou a credencial. Nenhuma acao foi executada; use diagnostico.')
                 else:
                     self._state('Ponte temporariamente indisponivel; reconexao automatica.')
-                delay = min(60, delay * 2)
+                delay = self._retry_delay(delay, exc)
             except Exception:
                 self._state('Sem comunicacao com a ponte; reconexao automatica.')
-                delay = min(60, delay * 2)
+                delay = self._retry_delay(delay)
             self.halt.wait(delay)
