@@ -79,7 +79,7 @@ class BridgeTests(unittest.TestCase):
         bridge.halt=StopAfterWait()
         bridge._run()
         self.assertEqual(calls,['/device/poll'])
-        self.assertEqual(bridge.halt.waits,[5])
+        self.assertEqual(bridge.halt.waits,[10])
 
     def test_retry_after_429_and_exponential_jitter(self):
         from urllib.error import HTTPError
