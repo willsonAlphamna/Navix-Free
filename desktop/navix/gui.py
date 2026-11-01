@@ -18,6 +18,7 @@ from .owner_auth import OwnerAccount
 from .tunnel_manager import TunnelManager, TunnelSettings
 from .donations import PIX_COPY_AND_PASTE, PIX_RANDOM_KEY, pix_qr_image
 from . import __version__
+from .admin_bridge import AdminBridge
 
 
 class ScrollableFrame(tk.Frame):
@@ -91,6 +92,8 @@ class Panel:
         self._flag_timer = None
         self.events = queue.Queue()
         self.busy = False
+        self.admin_bridge = AdminBridge(self.session, lambda: self.service,
+                                        lambda text: self.events.put(('tunnel_message', text)))
         self.tray = None
         self._permission_preferences = directory / 'permissions.json'
         try:
@@ -257,6 +260,8 @@ class Panel:
             self.root.deiconify()
             self.root.lift()
             self.diagnostics.record('owner', 'login_success')
+            if '--cloud-admin' in sys.argv:
+                self.root.after(200, self.start_cloud_admin)
 
         self._button(panel, 'Criar login e entrar' if create else 'Entrar no NavixX',
                      submit, tone='primary').pack(fill='x', pady=(7, 0))
@@ -528,6 +533,10 @@ class Panel:
         self._button(actions, 'Configurar acesso', lambda: self.show_page('permissoes'),
                      tone='primary').pack(side='left', padx=(0, 9))
         self._button(actions, 'PARAR ACESSO', self.stop, tone='danger').pack(side='left')
+        cloud_row = tk.Frame(page, bg=self.COLORS['base'])
+        cloud_row.pack(fill='x', pady=8)
+        self._button(cloud_row, 'ChatGPT Admin integrado', self.start_cloud_admin, tone='primary').pack(side='left')
+        self._button(cloud_row, 'Vincular navegador ao PC', self.pair_cloud_browser).pack(side='left', padx=8)
         cards = tk.Frame(page, bg=self.COLORS['base'])
         cards.pack(fill='x', pady=(0, gap))
         left_edge, left = self._card(cards, pad=18)
@@ -605,6 +614,10 @@ class Panel:
         self._button(actions, 'Conectar / Autorizar', self.connect,
                      tone='primary').pack(side='left', padx=(0, 8))
         self._button(actions, 'PARAR ACESSO', self.stop, tone='danger').pack(side='left')
+        cloud_row = tk.Frame(page, bg=self.COLORS['base'])
+        cloud_row.pack(fill='x', pady=8)
+        self._button(cloud_row, 'ChatGPT Admin integrado', self.start_cloud_admin, tone='primary').pack(side='left')
+        self._button(cloud_row, 'Vincular navegador ao PC', self.pair_cloud_browser).pack(side='left', padx=8)
         self._text(page, 'Alterar qualquer permissão revoga a sessão atual.\n'
                    'Acesso completo exige sua confirmação; não ultrapassa os limites do Windows.',
                    9, color=self.COLORS['subtle'], justify='left').pack(
@@ -805,6 +818,31 @@ class Panel:
         self.permissions_changed()
         self.show('Todas as permissões marcadas. Clique em Conectar / Autorizar para confirmar.')
 
+    def start_cloud_admin(self):
+        if not self._authenticated:
+            self.require_owner_login()
+            return
+        import ctypes
+        if os.name == 'nt' and not ctypes.windll.shell32.IsUserAnAdmin():
+            messagebox.showinfo('NavixX Admin', 'Feche o NavixX e abra o atalho NavixX Desktop Admin como administrador. O Windows solicitara consentimento.')
+            return
+        for option in (self.browser_allowed, self.desktop_allowed, self.files_allowed, self.commands_allowed):
+            option.set(True)
+        self.duration_minutes.set(translate('Sem prazo', self.language))
+        self.session.activate(['browser', 'desktop', 'files', 'commands'], minutes=None)
+        self._permission_preferences.write_text(json.dumps(['browser', 'desktop', 'files', 'commands']), encoding='utf-8')
+        self.service.start()
+        self.admin_bridge.start()
+        self.show('Modo Admin integrado ativo neste processo. PARAR ACESSO e Bloquear revogam as permissoes.')
+
+    def pair_cloud_browser(self):
+        if not self._authenticated:
+            self.require_owner_login()
+            return
+        if not self.session.status()['active']:
+            self.start_cloud_admin()
+        self.admin_bridge.pair()
+
     def connect(self):
         permissions = []
         if self.browser_allowed.get(): permissions.append('browser')
@@ -847,6 +885,8 @@ class Panel:
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
+        if hasattr(self, 'admin_bridge'):
+            self.admin_bridge.stop()
         self.tunnel.stop()
         self.session.stop()
         self.diagnostics.record('session', 'revoked')
@@ -987,6 +1027,8 @@ class Panel:
         if self.tray:
             self.tray.stop()
         self.session.stop()
+        if hasattr(self, 'admin_bridge'):
+            self.admin_bridge.close()
         self.tunnel.stop()
         self.service.close()
         try:
@@ -1001,3 +1043,4 @@ def main():
     root = tk.Tk()
     Panel(root)
     root.mainloop()
+

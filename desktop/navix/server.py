@@ -57,7 +57,12 @@ def make_app(session, browser, desktop, port=8765):
     @register
     def status() -> dict:
         """Estado real das permissões e tempo restante da sessão local."""
-        return session.status()
+        import ctypes
+        import os
+        result = session.status()
+        result.update({'administrator': bool(ctypes.windll.shell32.IsUserAnAdmin()) if os.name == 'nt' else False,
+                       'navix_version': __version__, 'admin_bridge_version': '0.2.0'})
+        return result
 
     @register
     def browser_tabs() -> list:
@@ -315,3 +320,4 @@ class Service:
             self.thread.join(timeout=5)
         if self.socket:
             self.socket.close()
+

@@ -9,7 +9,7 @@ DefaultDirName={localappdata}\Programs\NavixDesktop
 DefaultGroupName=Navix Desktop
 PrivilegesRequired=lowest
 OutputDir=output
-OutputBaseFilename=NavixDesktop-Setup-{#AppVersion}
+OutputBaseFilename=NavixDesktop-Setup-{#AppVersion}-AdminBridge
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -31,13 +31,15 @@ Source: "dist\NavixDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 [Tasks]
 Name: "startwithwindows"; Description: "Abrir o painel NavixX quando eu entrar no Windows (opcional)"; Flags: unchecked
 [Icons]
+Name: "{group}\NavixX Desktop Admin"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--cloud-admin --lang {language}"
+Name: "{autodesktop}\NavixX Desktop Admin"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--cloud-admin --lang {language}"
 Name: "{group}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"
 Name: "{autodesktop}\NavixX Desktop"; Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"
 Name: "{group}\Desinstalar NavixX Desktop"; Filename: "{uninstallexe}"
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "NavixXDesktop"; ValueData: """{app}\NavixDesktop.exe"" --lang {language}"; Tasks: startwithwindows; Flags: uninsdeletevalue
 [Run]
-Filename: "{app}\NavixDesktop.exe"; Parameters: "--lang {language}"; Description: "Abrir NavixX Desktop agora"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\NavixDesktop.exe"; Parameters: "--cloud-admin --lang {language}"; Description: "Abrir NavixX Desktop Admin e vincular ChatGPT"; Flags: nowait postinstall skipifsilent
 
 [CustomMessages]
 brazilianportuguese.WipeNavixData=Também deseja apagar PERMANENTEMENTE as configurações, senhas criptografadas, perfil de navegação e logs locais do NavixX? Se responder Não, eles serão preservados para uma futura reinstalação.%n%nEsta ação não pode ser desfeita.
@@ -64,3 +66,4 @@ begin
       MsgBox('NavixX: alguns dados locais não puderam ser removidos. Verifique a pasta AppData\\Local\\NavixDesktop.', mbInformation, MB_OK);
   end;
 end;
+

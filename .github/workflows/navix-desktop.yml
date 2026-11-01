@@ -1,10 +1,10 @@
 name: Navix Desktop - Windows piloto
 on:
   push:
-    branches: [feature/navix-desktop-zero, codex/navix-desktop-full-tools, fix/navix-desktop-0.2.12-background]
+    branches: [feature/navix-0.2.12-admin-bridge]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   pull_request:
-    branches: [feature/navix-desktop-zero, fix/navix-desktop-0.2.12-background]
+    branches: [fix/navix-desktop-0.2.12-background]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
 concurrency:
@@ -21,6 +21,13 @@ jobs:
         working-directory: desktop
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Testar ponte OAuth e fila
+        run: node --test cloud-admin/test-worker.mjs
+      - name: Verificar ponte HTTPS publicada
+        run: node cloud-admin/live-smoke.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -101,7 +108,7 @@ jobs:
       - name: Testar instalação e desinstalação
         shell: pwsh
         run: |
-          $install = Start-Process output\NavixDesktop-Setup-0.2.12.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          $install = Start-Process output\NavixDesktop-Setup-0.2.12-AdminBridge.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw 'Instalação falhou' }
           $exe = "$env:LOCALAPPDATA\Programs\NavixDesktop\NavixDesktop.exe"
           if (!(Test-Path $exe)) { throw 'Executável instalado não encontrado' }
@@ -134,7 +141,7 @@ jobs:
   publish_windows:
     name: Publicar instalador público (pré-lançamento)
     needs: windows
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/navix-desktop-0.2.12-background'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feature/navix-0.2.12-admin-bridge'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -146,7 +153,7 @@ jobs:
       - name: Conferir artefato antes da publicação
         shell: bash
         run: |
-          test -s release/NavixDesktop-Setup-0.2.12.exe
+          test -s release/NavixDesktop-Setup-0.2.12-AdminBridge.exe
           test -s release/SHA256.txt
           test -s release/packaged-selftest.json
       - name: Publicar pré-lançamento no GitHub Releases
@@ -155,8 +162,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.12 release/* \
+          gh release create navix-desktop-v0.2.12-adminbridge.1 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.12 — Estabilidade em segundo plano (experimental)" \
-            --notes "Correção experimental da linha NavixX Desktop 0.2.11: supervisão de reconexão independente da janela, tolerância a falhas transitórias de saúde local, e testes adicionais. Instalador pré-lançamento não assinado, derivado da tag v0.2.11. Não altera o NavixX Cloud 0.3. Validação automática no runner Windows não garante validação no PC do usuário; preservar logs, fechar 0.2.11 antes de instalar e testar minimização por período prolongado." \
+            --title "NavixX Desktop 0.2.12 + AdminBridge 0.2.0 (experimental)" \
+            --notes "Integracao experimental sobre a tag navix-desktop-v0.2.12: ponte HTTPS OAuth para Windows Admin Full, credenciais DPAPI, reconexao, MCP e permissoes nativos, atalho elevado e parada local. Preserva dados e login local. Instalador nao assinado. UAC, login local e autorizacao ChatGPT continuam necessarios. CI nao comprova controle no PC do proprietario. Nao altera a linha Cloud 0.3." \
             --prerelease
+
