@@ -824,7 +824,15 @@ class Panel:
             return
         import ctypes
         if os.name == 'nt' and not ctypes.windll.shell32.IsUserAnAdmin():
-            messagebox.showinfo('NavixX Admin', 'Feche o NavixX e abra o atalho NavixX Desktop Admin como administrador. O Windows solicitara consentimento.')
+            arguments = ['--cloud-admin', '--lang', self.language]
+            if not getattr(sys, 'frozen', False):
+                arguments.insert(0, str(Path(__file__).resolve().parent.parent / 'launcher.py'))
+            result = ctypes.windll.shell32.ShellExecuteW(None, 'runas', sys.executable,
+                        subprocess.list2cmdline(arguments), None, 1)
+            if result > 32:
+                self.close()
+            else:
+                messagebox.showinfo('NavixX Admin', 'O Windows nao autorizou a elevacao. Nenhuma permissao foi ampliada.')
             return
         for option in (self.browser_allowed, self.desktop_allowed, self.files_allowed, self.commands_allowed):
             option.set(True)

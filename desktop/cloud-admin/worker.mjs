@@ -57,6 +57,14 @@ export class Bridge {
       await this.put('setup:'+await hash(setup),{device},now()+600000);
       return json({device_id:device,agent_token:token,setup_url:base+'/setup#'+setup});
     }
+    if(path==='/device/remove' && r.method==='POST') {
+      const a=await this.agent(r);if(!a)return error('Nao autorizado',401);
+      const rows=await this.db.list();
+      for(const [key,v] of rows){
+        if(v.device===a.device||key==='device:'+a.device||key==='slot:'+a.device||key.startsWith('job:'+a.device+':')||key.startsWith('chunk:job:'+a.device+':'))await this.db.delete(key);
+      }
+      return json({removed:true});
+    }
     if(path==='/device/setup' && r.method==='POST') {
       const a=await this.agent(r);if(!a)return error('Nao autorizado',401);
       const setup=random();await this.put('setup:'+await hash(setup),{device:a.device},now()+600000);
