@@ -193,7 +193,14 @@ export class Bridge {
               }
               await new Promise(resolve=>setTimeout(resolve,400));
             }
-            if(!result){const job=await this.get(id);if(job?.state==='queued'){await this.db.delete(id);await this.db.delete(slot);}result=toolError(job?.state==='running'?'Tempo de resposta esgotado. A acao pode ter sido executada; confira o estado antes de repetir.':'PC nao recebeu a acao dentro do prazo.');}
+            if(!result){
+              const phase=await this.db.transaction(async tx=>{
+                const job=await tx.get(id);
+                if(job?.state==='queued'){await tx.delete(id);await tx.delete(slot);}
+                return job?.state;
+              });
+              result=toolError(['running','done'].includes(phase)?'Tempo de resposta esgotado. A acao pode ter sido executada; confira o estado antes de repetir.':'PC nao recebeu a acao dentro do prazo.');
+            }
           }
         }
       } else return json({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}});
