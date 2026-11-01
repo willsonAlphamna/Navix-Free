@@ -166,17 +166,26 @@ export class Bridge {
           if([...jobs.values()].some(j=>['queued','running'].includes(j.state)&&j.expires>now()))result=toolError('Ja existe uma acao em andamento neste PC. Aguarde o resultado.');
           else {
             const id='job:'+access.device+':'+random();
-            await this.put(id,{state:'queued',request:{jsonrpc:'2.0',id:msg.id,method:'tools/call',params:p}},now()+55000);
+            const slot='slot:'+access.device;
+            const claimed=await this.db.transaction(async tx=>{
+              const current=await tx.get(slot);if(current&&current.expires>now())return false;
+              const expires=now()+55000;
+              await tx.put(slot,{job:id,expires});
+              await tx.put(id,{state:'queued',request:{jsonrpc:'2.0',id:msg.id,method:'tools/call',params:p},expires});
+              return true;
+            });
+            if(!claimed)return json({jsonrpc:'2.0',id:msg.id,result:toolError('Ja existe uma acao em andamento neste PC.')});
+            if(!await this.db.getAlarm())await this.db.setAlarm(now()+60000);
             const deadline=now()+50000;
             while(now()<deadline){
               const job=await this.get(id);
               if(job?.state==='done'){
                 let combined='';for(let i=0;i<job.chunks;i++){const chunk=await this.get('chunk:'+id+':'+i);combined+=chunk?.text||'';await this.db.delete('chunk:'+id+':'+i);}
-                result=JSON.parse(combined);await this.db.delete(id);break;
+                result=JSON.parse(combined);await this.db.delete(id);await this.db.delete(slot);break;
               }
               await new Promise(resolve=>setTimeout(resolve,400));
             }
-            if(!result){const job=await this.get(id);if(job?.state==='queued')await this.db.delete(id);result=toolError(job?.state==='running'?'Tempo de resposta esgotado. A acao pode ter sido executada; confira o estado antes de repetir.':'PC nao recebeu a acao dentro do prazo.');}
+            if(!result){const job=await this.get(id);if(job?.state==='queued'){await this.db.delete(id);await this.db.delete(slot);}result=toolError(job?.state==='running'?'Tempo de resposta esgotado. A acao pode ter sido executada; confira o estado antes de repetir.':'PC nao recebeu a acao dentro do prazo.');}
           }
         }
       } else return json({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'Method not found'}});

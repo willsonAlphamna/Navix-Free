@@ -885,10 +885,10 @@ class Panel:
                 self.root.after(1400, self._launch_tunnel_worker)
 
     def stop(self):
+        self.session.stop()
         if hasattr(self, 'admin_bridge'):
             self.admin_bridge.stop()
         self.tunnel.stop()
-        self.session.stop()
         self.diagnostics.record('session', 'revoked')
         self.show('Acesso interrompido. Credencial anterior revogada.')
 

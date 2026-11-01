@@ -73,3 +73,15 @@ test('metadados OAuth e descoberta MCP',async()=>{
  const meta=await (await h.req('/.well-known/oauth-authorization-server')).json();assert.deepEqual(meta.code_challenge_methods_supported,['S256']);
  const r=await (await h.req('/mcp',{jsonrpc:'2.0',id:1,method:'tools/list'},{Authorization:'Bearer '+o.tokens.access_token})).json();assert.equal(r.result.tools.length,44);
 });
+test('fila atomica impede duas acoes simultaneas no mesmo PC',async()=>{
+ const h=harness(),d=await device(h),o=await oauth(h,d),auth={Authorization:'Bearer '+d.agent_token},client={Authorization:'Bearer '+o.tokens.access_token};
+ await h.req('/device/poll',{status:{}},auth);
+ const msg=id=>({jsonrpc:'2.0',id,method:'tools/call',params:{name:'status',arguments:{}}});
+ const first=h.req('/mcp',msg(1),client);
+ await new Promise(r=>setTimeout(r,20));
+ const second=await (await h.req('/mcp',msg(2),client)).json();assert.equal(second.result.isError,true);
+ const job=await (await h.req('/device/poll',{status:{}},auth)).json();
+ await h.req('/device/result',{job_id:job.job_id,result:{content:[{type:'text',text:'ok'}]}},auth);
+ assert.equal((await (await first).json()).result.content[0].text,'ok');
+ assert.equal((await h.db.list({prefix:'slot:'})).size,0);
+});
