@@ -175,7 +175,7 @@ class AdminBridge:
                                  'bridge_version':BRIDGE_VERSION, 'native_navix':True})
                 reply = self._cloud('/device/poll', {'status':snapshot, 'tools':self.tools})
                 self._state('Ponte online. Vinculo ChatGPT so e comprovado ao receber uma chamada autenticada.')
-                delay = 5
+                delay = 10
                 if reply.get('job_id'):
                     # Never run a remote job after local stop/lock/permission revocation.
                     if self.halt.is_set() or not self.enabled.is_set() or not self.session.status()['active']:
@@ -191,13 +191,14 @@ class AdminBridge:
                     self.pending_result = {'job_id':reply['job_id'], 'result':result}
                     self._persist_pending()
                     continue
-                # Without this idle pause the worker is flooded with polls and
-                # may respond 429 even while the PC and tunnel are healthy.
-                self.halt.wait(5)
+                # One 10-second idle delay below; the 30-second cloud
+                # offline threshold still allows two missed heartbeats.
             except error.HTTPError as exc:
                 if self.pending_result and exc.code == 410:
                     self._clear_pending()
                     self._state('Resultado expirado na nuvem; a acao nao sera repetida.')
+                    self.halt.wait(5)
+                    continue
                 if exc.code in (401, 403):
                     self._state('Ponte recusou a credencial. Nenhuma acao foi executada; use diagnostico.')
                 else:
