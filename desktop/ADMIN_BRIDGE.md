@@ -1,4 +1,4 @@
-# NavixX Desktop 0.2.12 + AdminBridge 0.2.0
+# NavixX Desktop 0.2.12 + AdminBridge 0.2.1
 
 Esta compilacao usa exatamente a tag navix-desktop-v0.2.12 como base. O
 instalador AdminBridge substitui o executavel do NavixX na mesma pasta, preserva
@@ -8,20 +8,26 @@ o agente independente Windows_Admin_Full_v0.1.0; nao execute aquele instalador.
 ## Fluxo
 
 1. Feche o NavixX antes de instalar a compilacao AdminBridge.
-2. O instalador abre NavixX Desktop Admin e solicita a elevacao normal UAC.
-3. Entre com o login local do NavixX. Ele continua obrigatorio; nenhuma senha e burlada.
-4. Neste modo, o NavixX ativa os quatro recursos sem prazo neste processo,
-   registra o PC automaticamente na ponte HTTPS e abre o navegador para vinculo.
-5. No navegador aberto, acesse Windows Admin Full no ChatGPT e autorize a conexao.
-   O navegador precisa ser o mesmo no qual o instalador vinculou o PC.
-6. A partir dai a ponte reaproveita o registro e se reconecta sozinha durante a
-   sessao. O atalho NavixX Desktop Admin repete UAC e login local quando necessario.
+2. Instale **somente o NavixX Desktop com AdminBridge** no Windows: a ponte ja
+   vem dentro do aplicativo, nao existe um segundo EXE para instalar.
+3. Abra NavixX Desktop Admin (o Windows pode solicitar UAC) e entre com o
+   login local. Nenhuma senha ou aprovacao e ignorada.
+4. Escolha as permissoes e clique em **Conectar / Autorizar**. O mesmo botao
+   inicia o MCP local e a ponte ChatGPT em segundo plano.
+5. Na primeira utilizacao, o NavixX registra o PC e abre um navegador para
+   vinculo. No ChatGPT, habilite o plugin **Windows Admin Full** e autorize
+   a conexao. Use o mesmo navegador que fez o primeiro pareamento.
+6. Depois do primeiro vinculo, os proximos cliques em Conectar reutilizam a
+   credencial local DPAPI e a ponte se reconecta automaticamente enquanto
+   a sessao estiver ativa. PARAR ACESSO interrompe o controle remoto.
 
 Nao ha chave de API OpenAI ou ID de tunel para copiar. A autorizacao inicial do
 ChatGPT e o UAC pertencem aos respectivos sistemas e nao sao suprimidos.
 
-O botao ChatGPT Admin integrado permite ativar o modo no painel; Vincular
-navegador ao PC recupera o vinculo em outro navegador. PARAR ACESSO e Bloquear
+O botao Conectar / Autorizar tambem inicia a ponte sem ampliar as permissoes
+selecionadas. ChatGPT Admin integrado e um modo opcional de acesso completo
+com UAC; Vincular navegador ao PC recupera o vinculo em outro navegador,
+sem conceder permissoes locais automaticamente. PARAR ACESSO e Bloquear
 revogam as permissoes locais. Mudancas de porta e token local sao acompanhadas
 pela ponte em memoria. Credenciais remotas ficam em admin-bridge.dpapi, ligadas
 ao mesmo usuario Windows. Os tokens locais MCP nao sao gravados nem enviados a nuvem.
