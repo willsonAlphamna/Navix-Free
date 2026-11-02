@@ -61,7 +61,7 @@ def make_app(session, browser, desktop, port=8765):
         import os
         result = session.status()
         result.update({'administrator': bool(ctypes.windll.shell32.IsUserAnAdmin()) if os.name == 'nt' else False,
-                       'navix_version': __version__, 'admin_bridge_version': '0.2.0'})
+                       'navix_version': __version__, 'admin_bridge_version': '0.2.1'})
         return result
 
     @register
