@@ -261,7 +261,7 @@ class Panel:
             self.root.lift()
             self.diagnostics.record('owner', 'login_success')
             if '--cloud-admin' in sys.argv:
-                self.root.after(200, self.start_cloud_admin)
+                self.show('ChatGPT Admin preparado. Selecione as permissoes e clique em Conectar / Autorizar. A primeira vinculacao sera aberta no navegador.')
 
         self._button(panel, 'Criar login e entrar' if create else 'Entrar no NavixX',
                      submit, tone='primary').pack(fill='x', pady=(7, 0))
@@ -848,7 +848,9 @@ class Panel:
             self.require_owner_login()
             return
         if not self.session.status()['active']:
-            self.start_cloud_admin()
+            self.show('Autorize a sessao em Conectar / Autorizar antes de vincular o navegador.')
+            return
+        self.admin_bridge.start()
         self.admin_bridge.pair()
 
     def connect(self):
@@ -882,6 +884,12 @@ class Panel:
         if hasattr(self, 'diagnostics'):
             self.diagnostics.record('session', 'authorized', code='UNLIMITED' if minutes is None else 'TIMED')
         self.service.start()
+        # The same Connect button now starts the authorized cloud bridge. It
+        # performs first-time pairing in the browser and later reconnects using
+        # DPAPI credentials; neither action bypasses owner login or local grants.
+        if hasattr(self, 'admin_bridge'):
+            self.admin_bridge.start()
+            self.show('Ponte ChatGPT iniciada. Se for o primeiro acesso, autorize o vinculo no navegador.')
         self.show('Sessão autorizada sem prazo neste processo.' if minutes is None else
                   f'Sessão autorizada por {minutes} minutos. Aguardando servidor MCP ficar pronto.')
         if hasattr(self, 'tunnel_settings'):
