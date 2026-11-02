@@ -13,7 +13,7 @@ import webbrowser
 from .tunnel_manager import _dpapi
 
 CLOUD_URL = 'https://windows-admin-full.navixx-alfamna.workers.dev'
-BRIDGE_VERSION = '0.2.0'
+BRIDGE_VERSION = '0.2.1'
 
 
 class AdminBridge:
