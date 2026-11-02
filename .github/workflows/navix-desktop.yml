@@ -1,10 +1,10 @@
 name: Navix Desktop - Windows piloto
 on:
   push:
-    branches: [feature/navix-0.2.12-admin-bridge]
+    branches: [feature/navix-0.2.12-admin-bridge, fix/adminbridge-resilient-polling-20261101]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   pull_request:
-    branches: [fix/navix-desktop-0.2.12-background]
+    branches: [fix/navix-desktop-0.2.12-background, feature/navix-0.2.12-admin-bridge]
     paths: ['desktop/**', '.github/workflows/navix-desktop.yml']
   workflow_dispatch:
 concurrency:
@@ -162,9 +162,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
-          gh release create navix-desktop-v0.2.12-adminbridge.1 release/* \
+          gh release create navix-desktop-v0.2.12-adminbridge.2 release/* \
             --target "$GITHUB_SHA" \
-            --title "NavixX Desktop 0.2.12 + AdminBridge 0.2.0 (experimental)" \
-            --notes "Integracao experimental sobre a tag navix-desktop-v0.2.12: ponte HTTPS OAuth para Windows Admin Full, credenciais DPAPI, reconexao, MCP e permissoes nativos, atalho elevado e parada local. Preserva dados e login local. Instalador nao assinado. UAC, login local e autorizacao ChatGPT continuam necessarios. CI nao comprova controle no PC do proprietario. Nao altera a linha Cloud 0.3." \
+            --title "NavixX Desktop 0.2.12 + AdminBridge 0.2.1 (experimental)" \
+            --notes "Integracao experimental sobre NavixX Desktop 0.2.12: um clique em Conectar ativa MCP e ponte HTTPS, vinculo inicial OAuth no ChatGPT, credenciais DPAPI, reconexao com espera progressiva, resultados pendentes protegidos, e permissoes locais preservadas. Preserva dados e login local. Instalador nao assinado. UAC, login local e autorizacao ChatGPT continuam necessarios. CI nao comprova controle no PC do proprietario. Nao altera a linha Cloud 0.3." \
             --prerelease
 

@@ -1,0 +1,27 @@
+name: NavixX AdminBridge - testes de resiliencia
+on:
+  push:
+    paths:
+      - 'desktop/navix/admin_bridge.py'
+      - 'desktop/tests/test_admin_bridge.py'
+      - '.github/workflows/adminbridge-resilience.yml'
+  pull_request:
+    paths:
+      - 'desktop/navix/admin_bridge.py'
+      - 'desktop/tests/test_admin_bridge.py'
+      - '.github/workflows/adminbridge-resilience.yml'
+permissions:
+  contents: read
+jobs:
+  bridge:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verificar sintaxe
+        run: python -m compileall -q desktop/navix/admin_bridge.py desktop/tests/test_admin_bridge.py
+      - name: Testar autorizacao, recuperacao e limite de requisicoes
+        run: python -m unittest discover -s desktop/tests -p test_admin_bridge.py -v

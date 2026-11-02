@@ -127,3 +127,44 @@ def test_select_all_does_not_grant_session_without_connect(tmp_path):
     assert all(flag.get() for flag in
                (ui.browser_allowed, ui.desktop_allowed, ui.files_allowed, ui.commands_allowed))
     assert not ui.session.status()['active']
+
+
+def test_connect_starts_bridge_with_only_selected_permissions(tmp_path):
+    ui, _, messages = panel(tmp_path)
+    class Flag:
+        def __init__(self,value):self.value=value
+        def get(self):return self.value
+    ui.browser_allowed=Flag(True)
+    ui.desktop_allowed=Flag(False)
+    ui.files_allowed=Flag(False)
+    ui.commands_allowed=Flag(False)
+    ui.duration_minutes=Flag(30)
+    calls=[]
+    ui.service.start=lambda:calls.append('mcp')
+    ui.admin_bridge=SimpleNamespace(start=lambda:calls.append('bridge'))
+    Panel.connect(ui)
+    assert calls == ['mcp','bridge']
+    assert ui.session.status()['permissions'] == ['browser']
+    assert any('Ponte ChatGPT iniciada' in message for message in messages)
+
+
+def test_pair_does_not_grant_permissions_without_connect(tmp_path):
+    ui, _, messages = panel(tmp_path)
+    ui._authenticated=True
+    calls=[]
+    ui.admin_bridge=SimpleNamespace(start=lambda:calls.append('start'),pair=lambda:calls.append('pair'))
+    Panel.pair_cloud_browser(ui)
+    assert calls == []
+    assert not ui.session.status()['active']
+    assert any('Conectar / Autorizar' in message for message in messages)
+
+
+def test_pair_reuses_existing_authorized_session(tmp_path):
+    ui, _, _ = panel(tmp_path)
+    ui._authenticated=True
+    ui.session.activate(['browser'])
+    calls=[]
+    ui.admin_bridge=SimpleNamespace(start=lambda:calls.append('start'),pair=lambda:calls.append('pair'))
+    Panel.pair_cloud_browser(ui)
+    assert calls == ['start','pair']
+    assert ui.session.status()['permissions'] == ['browser']
